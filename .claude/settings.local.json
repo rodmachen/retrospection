@@ -14,7 +14,8 @@
       "Bash(gh pr:*)",
       "Bash(git commit -m \"Step 2: Supabase/Drizzle schema and DB client:*)",
       "Bash(git commit -m \"Step 3: Todoist API client \\(TDD\\):*)",
-      "Bash(git commit -m \"Step 4: Seed script with upsert functions \\(TDD\\):*)"
+      "Bash(git commit -m \"Step 4: Seed script with upsert functions \\(TDD\\):*)",
+      "Bash(git commit -m \"Step 6: REST API routes with Bearer auth middleware \\(TDD\\):*)"
     ]
   }
 }

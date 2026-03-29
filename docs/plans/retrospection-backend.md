@@ -178,7 +178,7 @@ Also handle `project:added`, `project:updated`, `project:deleted`.
 
 ---
 
-## Step 6: Build simple REST API routes
+## Step 6: Build simple REST API routes ✅
 
 **Model: Sonnet** | TDD | Files: `app/api/*`, `src/api/*`
 
