@@ -72,7 +72,7 @@ Webhook registration is done manually in the [Todoist App Management Console](ht
 
 ---
 
-## Step 1: Initialize Next.js project and deploy to Vercel
+## Step 1: Initialize Next.js project and deploy to Vercel ✅
 
 **Model: Sonnet** | Tests-alongside | New repo
 
@@ -88,7 +88,7 @@ Create the `retrospection` repo with Next.js (App Router), TypeScript strict mod
 
 ---
 
-## Step 2: Set up Supabase and Drizzle schema
+## Step 2: Set up Supabase and Drizzle schema ✅
 
 **Model: Sonnet** | Tests-alongside | Files: `src/db/*`, `drizzle.config.ts`
 
@@ -108,7 +108,7 @@ Create the `retrospection` repo with Next.js (App Router), TypeScript strict mod
 
 ---
 
-## Step 3: Build Todoist API client
+## Step 3: Build Todoist API client ✅
 
 **Model: Sonnet** | TDD | Files: `src/todoist/*`
 
@@ -127,7 +127,7 @@ Build a focused Todoist API client that returns raw API types (not mapped to Rem
 
 ---
 
-## Step 4: Build seed script (one-time backfill)
+## Step 4: Build seed script (one-time backfill) ✅
 
 **Model: Opus** | TDD | Files: `src/sync/*`, `scripts/seed.ts`
 
