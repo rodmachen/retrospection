@@ -9,7 +9,10 @@
       "Bash(npm install:*)",
       "Bash(npm test:*)",
       "Bash(npm run:*)",
-      "Bash(git commit -m \"Step 1: Initialize Next.js project with health check and CI:*)"
+      "Bash(git commit -m \"Step 1: Initialize Next.js project with health check and CI:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr:*)",
+      "Bash(git commit -m \"Step 2: Supabase/Drizzle schema and DB client:*)"
     ]
   }
 }
