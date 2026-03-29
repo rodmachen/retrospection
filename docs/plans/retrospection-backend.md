@@ -146,7 +146,7 @@ For **active recurring tasks** with due dates in the future: infer today's compl
 
 ---
 
-## Step 5: Build webhook endpoint
+## Step 5: Build webhook endpoint ✅
 
 **Model: Opus** | TDD | Files: `app/api/webhook/todoist/route.ts`, `src/sync/webhook.ts`
 
