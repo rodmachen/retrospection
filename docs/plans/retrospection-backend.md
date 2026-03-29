@@ -212,7 +212,7 @@ Add a few Next.js API routes for basic programmatic data access. These are inten
 
 ---
 
-## Step 7: End-to-end verification
+## Step 7: End-to-end verification ✅
 
 **Model: Sonnet** | Tests-alongside
 
