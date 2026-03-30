@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock the Todoist client
 vi.mock("../../todoist/client", () => ({
   syncAll: vi.fn(),
+  fetchCompletedTasks: vi.fn(),
 }));
 
 // Mock the upsert module
@@ -10,15 +11,17 @@ vi.mock("../../sync/upsert", () => ({
   upsertProjects: vi.fn(),
   upsertSections: vi.fn(),
   upsertTasks: vi.fn(),
+  insertTaskCompletion: vi.fn(),
   inferRecurringCompletions: vi.fn(),
 }));
 
 import { runSeed } from "../../sync/seed";
-import { syncAll } from "../../todoist/client";
+import { syncAll, fetchCompletedTasks } from "../../todoist/client";
 import {
   upsertProjects,
   upsertSections,
   upsertTasks,
+  insertTaskCompletion,
   inferRecurringCompletions,
 } from "../../sync/upsert";
 
@@ -57,6 +60,12 @@ describe("runSeed", () => {
         },
       ],
     });
+    vi.mocked(fetchCompletedTasks).mockResolvedValue([
+      {
+        task_id: "t2", content: "Done task", project_id: "p1",
+        section_id: null, completed_at: "2024-06-15T12:00:00Z", id: "c1",
+      },
+    ]);
     vi.mocked(inferRecurringCompletions).mockResolvedValue(0);
 
     const result = await runSeed(db as never, "test-token", "America/Chicago");
@@ -64,18 +73,28 @@ describe("runSeed", () => {
     expect(result.projects).toBe(1);
     expect(result.sections).toBe(1);
     expect(result.activeTasks).toBe(1);
-    expect(result.completedTasks).toBe(0);
+    expect(result.completedTasks).toBe(1);
     expect(result.inferredCompletions).toBe(0);
 
     // Verify order: projects → sections → tasks
     expect(upsertProjects).toHaveBeenCalledBefore(vi.mocked(upsertSections));
     expect(upsertSections).toHaveBeenCalledBefore(vi.mocked(upsertTasks));
+
+    // Verify completions were inserted
+    expect(insertTaskCompletion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        taskId: "t2",
+        completedDate: "2024-06-15",
+      })
+    );
   });
 
   it("returns result with inferred recurring completions count", async () => {
     const db = createMockDb();
 
     vi.mocked(syncAll).mockResolvedValue({ projects: [], sections: [], activeTasks: [] });
+    vi.mocked(fetchCompletedTasks).mockResolvedValue([]);
     vi.mocked(inferRecurringCompletions).mockResolvedValue(3);
 
     const result = await runSeed(db as never, "test-token", "America/Chicago");
@@ -92,6 +111,7 @@ describe("runSeed", () => {
     const db = createMockDb();
 
     vi.mocked(syncAll).mockResolvedValue({ projects: [], sections: [], activeTasks: [] });
+    vi.mocked(fetchCompletedTasks).mockResolvedValue([]);
     vi.mocked(inferRecurringCompletions).mockResolvedValue(0);
 
     await runSeed(db as never, "test-token", "America/Chicago");

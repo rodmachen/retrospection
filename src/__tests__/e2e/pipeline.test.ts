@@ -10,6 +10,7 @@ import crypto from "crypto";
 // Mock Todoist client
 vi.mock("../../todoist/client", () => ({
   syncAll: vi.fn(),
+  fetchCompletedTasks: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock DB upserts/inserts at the sync layer
