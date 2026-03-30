@@ -19,7 +19,13 @@
       "Bash(git commit -m \"Step 7: E2E pipeline test, README, and env.example:*)",
       "Bash(git commit -m \"Handle 410 Gone from projects and sections API endpoints:*)",
       "Bash(git commit -m \"Switch Todoist client from REST v2 to Sync API v9:*)",
-      "Bash(git commit -m \"Use single syncAll call instead of 3 parallel requests:*)"
+      "Bash(git commit -m \"Use single syncAll call instead of 3 parallel requests:*)",
+      "Bash(curl -s -L \"https://developer.todoist.com/api/v1/\")",
+      "WebFetch(domain:developer.todoist.com)",
+      "Bash(curl -s \"https://developer.todoist.com/api/v1/\")",
+      "Bash(curl -s -L \"https://developer.todoist.com/api/v1/openapi.json\" -o /tmp/todoist-openapi.json)",
+      "Read(//tmp/**)",
+      "Bash(git commit -m \"Migrate to Todoist API v1 \\(REST v2 and Sync v9 deprecated\\):*)"
     ]
   }
 }

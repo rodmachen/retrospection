@@ -219,7 +219,7 @@ async function handleProjectUpsert(
     id: String(eventData.id),
     name: String(eventData.name ?? ""),
     color: String(eventData.color ?? ""),
-    is_inbox_project: Boolean(eventData.is_inbox_project ?? false),
+    is_inbox_project: Boolean(eventData.inbox_project ?? false),
     created_at: String(
       eventData.created_at ?? new Date().toISOString()
     ),
@@ -265,8 +265,8 @@ function eventDataToTodoistTask(
           timezone: due.timezone,
         }
       : null,
-    is_completed: Boolean(data.is_completed ?? false),
+    is_completed: Boolean(data.checked ?? false),
     completed_at: (data.completed_at as string) ?? null,
-    created_at: String(data.created_at ?? new Date().toISOString()),
+    created_at: String(data.added_at ?? new Date().toISOString()),
   };
 }
