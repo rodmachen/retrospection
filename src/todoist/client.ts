@@ -70,25 +70,39 @@ function mapItem(item: SyncItem): TodoistTask {
   };
 }
 
+export async function syncAll(token: string): Promise<{
+  projects: TodoistProject[];
+  sections: TodoistSection[];
+  activeTasks: TodoistTask[];
+}> {
+  const data = await syncRequest(token, ["projects", "sections", "items"]);
+  return {
+    projects: (data.projects ?? [])
+      .filter((p) => !p.is_deleted && !p.is_archived)
+      .map(mapProject),
+    sections: (data.sections ?? [])
+      .filter((s) => !s.is_deleted && !s.is_archived)
+      .map(mapSection),
+    activeTasks: (data.items ?? [])
+      .filter((item) => !item.is_deleted && !item.checked)
+      .map(mapItem),
+  };
+}
+
+// Keep individual fetches for backwards compatibility with webhook/tests
 export async function fetchProjects(token: string): Promise<TodoistProject[]> {
-  const data = await syncRequest(token, ["projects"]);
-  return data.projects
-    .filter((p) => !p.is_deleted && !p.is_archived)
-    .map(mapProject);
+  const { projects } = await syncAll(token);
+  return projects;
 }
 
 export async function fetchSections(token: string): Promise<TodoistSection[]> {
-  const data = await syncRequest(token, ["sections"]);
-  return data.sections
-    .filter((s) => !s.is_deleted && !s.is_archived)
-    .map(mapSection);
+  const { sections } = await syncAll(token);
+  return sections;
 }
 
 export async function fetchActiveTasks(token: string): Promise<TodoistTask[]> {
-  const data = await syncRequest(token, ["items"]);
-  return data.items
-    .filter((item) => !item.is_deleted && !item.checked)
-    .map(mapItem);
+  const { activeTasks } = await syncAll(token);
+  return activeTasks;
 }
 
 export async function fetchCompletedTasks(

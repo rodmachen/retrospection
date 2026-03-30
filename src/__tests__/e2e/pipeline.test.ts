@@ -9,10 +9,7 @@ import crypto from "crypto";
 
 // Mock Todoist client
 vi.mock("../../todoist/client", () => ({
-  fetchProjects: vi.fn(),
-  fetchSections: vi.fn(),
-  fetchActiveTasks: vi.fn(),
-  fetchCompletedTasks: vi.fn(),
+  syncAll: vi.fn(),
 }));
 
 // Mock DB upserts/inserts at the sync layer
@@ -28,12 +25,7 @@ vi.mock("../../sync/upsert", () => ({
 import { runSeed } from "../../sync/seed";
 import { processWebhookEvent } from "../../sync/webhook";
 import { queryTaskById } from "../../api/queries";
-import {
-  fetchProjects,
-  fetchSections,
-  fetchActiveTasks,
-  fetchCompletedTasks,
-} from "../../todoist/client";
+import { syncAll } from "../../todoist/client";
 import { upsertTasks, insertTaskCompletion } from "../../sync/upsert";
 
 beforeEach(() => {
@@ -72,19 +64,18 @@ describe("Pipeline: seed → webhook → REST", () => {
   it("Step 1: seed populates tasks", async () => {
     const db = createMockDb();
 
-    vi.mocked(fetchProjects).mockResolvedValue([
-      { id: "p1", name: "Work", color: "blue", is_inbox_project: false, created_at: "2024-01-01T00:00:00Z" },
-    ]);
-    vi.mocked(fetchSections).mockResolvedValue([]);
-    vi.mocked(fetchActiveTasks).mockResolvedValue([
-      {
-        id: "t1", content: "Write tests", description: "", project_id: "p1",
-        section_id: null, parent_id: null, priority: 2, labels: [],
-        due: null, is_completed: false, completed_at: null,
-        created_at: "2024-01-01T00:00:00Z",
-      },
-    ]);
-    vi.mocked(fetchCompletedTasks).mockResolvedValue([]);
+    vi.mocked(syncAll).mockResolvedValue({
+      projects: [{ id: "p1", name: "Work", color: "blue", is_inbox_project: false, created_at: "2024-01-01T00:00:00Z" }],
+      sections: [],
+      activeTasks: [
+        {
+          id: "t1", content: "Write tests", description: "", project_id: "p1",
+          section_id: null, parent_id: null, priority: 2, labels: [],
+          due: null, is_completed: false, completed_at: null,
+          created_at: "2024-01-01T00:00:00Z",
+        },
+      ],
+    });
 
     const result = await runSeed(db as never, "test-token", "America/Chicago");
 
