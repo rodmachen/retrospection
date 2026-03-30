@@ -15,124 +15,160 @@ beforeEach(() => {
   mockFetch.mockReset();
 });
 
+function mockSyncResponse(overrides: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    json: async () => ({
+      sync_token: "abc123",
+      projects: [],
+      sections: [],
+      items: [],
+      ...overrides,
+    }),
+  };
+}
+
 describe("fetchProjects", () => {
-  it("returns array of projects", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => [
-        { id: "1", name: "Inbox", color: "blue", is_inbox_project: true, created_at: "2024-01-01T00:00:00Z" },
-      ],
-    });
+  it("returns mapped projects from Sync API", async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockSyncResponse({
+        projects: [
+          {
+            id: "1",
+            name: "Inbox",
+            color: "blue",
+            is_inbox_project: true,
+            is_deleted: false,
+            is_archived: false,
+            added_at: "2024-01-01T00:00:00Z",
+          },
+        ],
+      })
+    );
 
     const result = await fetchProjects(TOKEN);
 
     expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.todoist.com/rest/v2/projects",
+      "https://api.todoist.com/sync/v9/sync",
       expect.objectContaining({
+        method: "POST",
         headers: expect.objectContaining({ Authorization: `Bearer ${TOKEN}` }),
       })
     );
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("Inbox");
+    expect(result[0].is_inbox_project).toBe(true);
+    expect(result[0].created_at).toBe("2024-01-01T00:00:00Z");
+  });
+
+  it("filters out deleted and archived projects", async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockSyncResponse({
+        projects: [
+          { id: "1", name: "Active", color: "blue", is_inbox_project: false, is_deleted: false, is_archived: false, added_at: "2024-01-01T00:00:00Z" },
+          { id: "2", name: "Deleted", color: "red", is_inbox_project: false, is_deleted: true, is_archived: false, added_at: "2024-01-01T00:00:00Z" },
+          { id: "3", name: "Archived", color: "green", is_inbox_project: false, is_deleted: false, is_archived: true, added_at: "2024-01-01T00:00:00Z" },
+        ],
+      })
+    );
+
+    const result = await fetchProjects(TOKEN);
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe("Active");
   });
 
   it("throws on non-ok response", async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401, statusText: "Unauthorized" });
-    await expect(fetchProjects(TOKEN)).rejects.toThrow("Todoist API error: 401 Unauthorized");
+    await expect(fetchProjects(TOKEN)).rejects.toThrow("Todoist Sync API error: 401 Unauthorized");
   });
 });
 
 describe("fetchSections", () => {
-  it("returns array of sections", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => [
-        { id: "s1", project_id: "p1", name: "Section A", order: 1 },
-      ],
-    });
+  it("returns mapped sections from Sync API", async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockSyncResponse({
+        sections: [
+          { id: "s1", project_id: "p1", name: "Section A", section_order: 1, is_deleted: false, is_archived: false },
+        ],
+      })
+    );
 
     const result = await fetchSections(TOKEN);
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.todoist.com/rest/v2/sections",
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: `Bearer ${TOKEN}` }),
-      })
-    );
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe("Section A");
+    expect(result[0].order).toBe(1);
+  });
+
+  it("filters out deleted and archived sections", async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockSyncResponse({
+        sections: [
+          { id: "s1", project_id: "p1", name: "Active", section_order: 1, is_deleted: false, is_archived: false },
+          { id: "s2", project_id: "p1", name: "Deleted", section_order: 2, is_deleted: true, is_archived: false },
+        ],
+      })
+    );
+
+    const result = await fetchSections(TOKEN);
+    expect(result).toHaveLength(1);
   });
 });
 
 describe("fetchActiveTasks", () => {
-  it("returns array of active tasks", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => [
-        {
-          id: "t1",
-          content: "Buy milk",
-          description: "",
-          project_id: "p1",
-          section_id: null,
-          parent_id: null,
-          priority: 1,
-          labels: [],
-          due: null,
-          is_completed: false,
-          completed_at: null,
-          created_at: "2024-01-01T00:00:00Z",
-        },
-      ],
-    });
+  it("returns mapped active tasks from Sync API", async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockSyncResponse({
+        items: [
+          {
+            id: "t1",
+            content: "Buy milk",
+            description: "",
+            project_id: "p1",
+            section_id: null,
+            parent_id: null,
+            priority: 1,
+            labels: [],
+            due: null,
+            checked: false,
+            date_completed: null,
+            added_at: "2024-01-01T00:00:00Z",
+            is_deleted: false,
+          },
+        ],
+      })
+    );
 
     const result = await fetchActiveTasks(TOKEN);
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.todoist.com/rest/v2/tasks",
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: `Bearer ${TOKEN}` }),
-      })
-    );
     expect(result).toHaveLength(1);
     expect(result[0].content).toBe("Buy milk");
+    expect(result[0].is_completed).toBe(false);
+    expect(result[0].created_at).toBe("2024-01-01T00:00:00Z");
+  });
+
+  it("filters out deleted and completed items", async () => {
+    mockFetch.mockResolvedValueOnce(
+      mockSyncResponse({
+        items: [
+          { id: "t1", content: "Active", description: "", project_id: "p1", section_id: null, parent_id: null, priority: 1, labels: [], due: null, checked: false, date_completed: null, added_at: "2024-01-01T00:00:00Z", is_deleted: false },
+          { id: "t2", content: "Completed", description: "", project_id: "p1", section_id: null, parent_id: null, priority: 1, labels: [], due: null, checked: true, date_completed: "2024-06-15T12:00:00Z", added_at: "2024-01-01T00:00:00Z", is_deleted: false },
+          { id: "t3", content: "Deleted", description: "", project_id: "p1", section_id: null, parent_id: null, priority: 1, labels: [], due: null, checked: false, date_completed: null, added_at: "2024-01-01T00:00:00Z", is_deleted: true },
+        ],
+      })
+    );
+
+    const result = await fetchActiveTasks(TOKEN);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("t1");
   });
 });
 
 describe("fetchCompletedTasks", () => {
-  it("fetches completed tasks for given days", async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        items: [
-          {
-            task_id: "t1",
-            content: "Done task",
-            project_id: "p1",
-            section_id: null,
-            completed_at: "2024-01-07T12:00:00Z",
-            id: "c1",
-          },
-        ],
-      }),
-    });
-
+  it("returns empty array (endpoint unavailable)", async () => {
     const result = await fetchCompletedTasks(TOKEN, 7);
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("https://api.todoist.com/sync/v9/items/completed/get_all"),
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: `Bearer ${TOKEN}` }),
-      })
-    );
-    const calledUrl = mockFetch.mock.calls[0][0] as string;
-    expect(calledUrl).toContain("since=");
-    expect(result).toHaveLength(1);
-    expect(result[0].content).toBe("Done task");
-  });
-
-  it("throws on non-ok response", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 403, statusText: "Forbidden" });
-    await expect(fetchCompletedTasks(TOKEN, 7)).rejects.toThrow("Todoist API error: 403 Forbidden");
+    expect(result).toEqual([]);
+    // Should not make any API calls
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
