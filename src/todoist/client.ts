@@ -44,6 +44,24 @@ export async function fetchCompletedTasks(
   const sinceIso = since.toISOString();
 
   const url = `${SYNC_BASE}/items/completed/get_all?since=${encodeURIComponent(sinceIso)}&limit=200`;
-  const data = await apiGet<{ items: TodoistCompletedTask[] }>(url, token);
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  // 410 Gone = endpoint deprecated or unavailable on this plan
+  if (response.status === 410) {
+    console.warn("Completed tasks API returned 410 Gone — skipping completed task backfill");
+    return [];
+  }
+
+  if (!response.ok) {
+    throw new Error(`Todoist API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = (await response.json()) as { items: TodoistCompletedTask[] };
   return data.items;
 }
