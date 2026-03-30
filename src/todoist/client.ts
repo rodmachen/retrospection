@@ -23,12 +23,47 @@ async function apiGet<T>(url: string, token: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function apiGetWithFallback<T>(
+  url: string,
+  token: string,
+  fallback: T,
+  label: string
+): Promise<T> {
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (response.status === 410) {
+    console.warn(`${label} returned 410 Gone — skipping`);
+    return fallback;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Todoist API error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
 export async function fetchProjects(token: string): Promise<TodoistProject[]> {
-  return apiGet<TodoistProject[]>(`${REST_BASE}/projects`, token);
+  return apiGetWithFallback<TodoistProject[]>(
+    `${REST_BASE}/projects`,
+    token,
+    [],
+    "Projects API"
+  );
 }
 
 export async function fetchSections(token: string): Promise<TodoistSection[]> {
-  return apiGet<TodoistSection[]>(`${REST_BASE}/sections`, token);
+  return apiGetWithFallback<TodoistSection[]>(
+    `${REST_BASE}/sections`,
+    token,
+    [],
+    "Sections API"
+  );
 }
 
 export async function fetchActiveTasks(token: string): Promise<TodoistTask[]> {
@@ -45,23 +80,11 @@ export async function fetchCompletedTasks(
 
   const url = `${SYNC_BASE}/items/completed/get_all?since=${encodeURIComponent(sinceIso)}&limit=200`;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  // 410 Gone = endpoint deprecated or unavailable on this plan
-  if (response.status === 410) {
-    console.warn("Completed tasks API returned 410 Gone — skipping completed task backfill");
-    return [];
-  }
-
-  if (!response.ok) {
-    throw new Error(`Todoist API error: ${response.status} ${response.statusText}`);
-  }
-
-  const data = (await response.json()) as { items: TodoistCompletedTask[] };
-  return data.items;
+  const items = await apiGetWithFallback<{ items: TodoistCompletedTask[] } | null>(
+    url,
+    token,
+    null,
+    "Completed tasks API"
+  );
+  return items?.items ?? [];
 }
