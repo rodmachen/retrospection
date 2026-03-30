@@ -26,7 +26,8 @@
       "Bash(curl -s -L \"https://developer.todoist.com/api/v1/openapi.json\" -o /tmp/todoist-openapi.json)",
       "Read(//tmp/**)",
       "Bash(git commit -m \"Migrate to Todoist API v1 \\(REST v2 and Sync v9 deprecated\\):*)",
-      "Bash(git commit -m \"Restore completed tasks backfill in seed \\(available in API v1\\):*)"
+      "Bash(git commit -m \"Restore completed tasks backfill in seed \\(available in API v1\\):*)",
+      "Bash(git commit -m \"Update plan with API v1 migration notes and detailed webhook connection steps:*)"
     ]
   }
 }
