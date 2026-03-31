@@ -31,7 +31,7 @@ Three related issues need addressing:
 
 ---
 
-## Step 2: Backfill missing completions from activity log
+## Step 2: Backfill missing completions from activity log ✅
 
 **Model: Sonnet** | Tests-alongside | Files: `scripts/backfill-completions.ts`
 
