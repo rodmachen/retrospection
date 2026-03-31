@@ -68,7 +68,7 @@ All inserted with `completedAt: null` (no exact timestamps from activity log). S
 
 ---
 
-## Step 3: Add parentId index and subtask nesting to task queries
+## Step 3: Add parentId index and subtask nesting to task queries ✅
 
 **Model: Sonnet** | TDD for nesting logic, tests-alongside for route wiring
 
