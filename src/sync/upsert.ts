@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { projects, sections, tasks, taskCompletions } from "../db/schema";
 import type { Db } from "../db/client";
 import type {
@@ -23,12 +24,12 @@ export async function upsertProjects(db: Db, items: TodoistProject[]) {
     )
     .onConflictDoUpdate({
       target: projects.id,
-      set: (excluded) => ({
-        name: excluded.name,
-        isInbox: excluded.isInbox,
-        color: excluded.color,
+      set: {
+        name: sql`excluded.name`,
+        isInbox: sql`excluded.is_inbox`,
+        color: sql`excluded.color`,
         updatedAt: new Date(),
-      }),
+      },
     });
 }
 
@@ -48,12 +49,12 @@ export async function upsertSections(db: Db, items: TodoistSection[]) {
     )
     .onConflictDoUpdate({
       target: sections.id,
-      set: (excluded) => ({
-        name: excluded.name,
-        projectId: excluded.projectId,
-        order: excluded.order,
+      set: {
+        name: sql`excluded.name`,
+        projectId: sql`excluded.project_id`,
+        order: sql`excluded."order"`,
         updatedAt: new Date(),
-      }),
+      },
     });
 }
 
@@ -88,24 +89,24 @@ export async function upsertTasks(db: Db, items: TodoistTask[]) {
     .values(items.map(mapTodoistTask))
     .onConflictDoUpdate({
       target: tasks.id,
-      set: (excluded) => ({
-        content: excluded.content,
-        description: excluded.description,
-        projectId: excluded.projectId,
-        sectionId: excluded.sectionId,
-        parentId: excluded.parentId,
-        priority: excluded.priority,
-        labels: excluded.labels,
-        dueDate: excluded.dueDate,
-        dueIsRecurring: excluded.dueIsRecurring,
-        dueString: excluded.dueString,
-        dueTimezone: excluded.dueTimezone,
-        isCompleted: excluded.isCompleted,
-        completedAt: excluded.completedAt,
+      set: {
+        content: sql`excluded.content`,
+        description: sql`excluded.description`,
+        projectId: sql`excluded.project_id`,
+        sectionId: sql`excluded.section_id`,
+        parentId: sql`excluded.parent_id`,
+        priority: sql`excluded.priority`,
+        labels: sql`excluded.labels`,
+        dueDate: sql`excluded.due_date`,
+        dueIsRecurring: sql`excluded.due_is_recurring`,
+        dueString: sql`excluded.due_string`,
+        dueTimezone: sql`excluded.due_timezone`,
+        isCompleted: sql`excluded.is_completed`,
+        completedAt: sql`excluded.completed_at`,
         lastSyncedAt: new Date(),
-        rawJson: excluded.rawJson,
+        rawJson: sql`excluded.raw_json`,
         updatedAt: new Date(),
-      }),
+      },
     });
 }
 
