@@ -21,6 +21,7 @@ Phase 1 covers: Supabase database, Todoist API client, one-time seed script, web
 | Webhook host | Vercel serverless function | `/api/webhook/todoist` — same platform as eventual frontend |
 | API layer | Simple REST routes | A few Next.js API routes for programmatic access. Full API approach (GraphQL/tRPC/server components) deferred to Phase 2. |
 | Todoist API client | New implementation | Separate repo can't import from command-center. Clean rewrite focused on raw data (not mapped to Reminder types). |
+| Todoist API version | **API v1** (`/api/v1/`) | REST v2 and Sync v9 are fully deprecated (410 Gone as of March 2026). API v1 unifies both under a single cursor-paginated REST interface. |
 
 ## Database Schema
 
@@ -58,6 +59,21 @@ The `task_completions` ledger table solves this. Each completion (recurring or o
 
 **Seed script:** For the initial backfill, completed tasks from the API go into `task_completions`. Active recurring tasks with future due dates get a completion inferred for today (same heuristic as habits tracker). **Important caveat:** The seed can only infer *today's* recurring completions. Completions from 2+ days ago are unrecoverable — Todoist doesn't expose them in the completed API for recurring tasks, and the active task only holds the next due date. Once the webhook is live, this gap disappears.
 
+## Todoist API v1 Notes
+
+REST v2 (`/rest/v2/`) and Sync v9 (`/sync/v9/`) are fully deprecated as of March 2026 — all endpoints return 410 Gone. The unified **API v1** (`/api/v1/`) replaces both.
+
+**Key API v1 differences from the original plan:**
+- Base URL: `https://api.todoist.com/api/v1/`
+- All list endpoints are **cursor-paginated**: response is `{ results: [...], next_cursor: string | null }` (completed tasks uses `items` instead of `results`)
+- Task field renames: `checked` (not `is_completed`), `added_at` (not `created_at`), `completed_at` present directly
+- Project field rename: `inbox_project` (not `is_inbox_project`)
+- Section field rename: `section_order` (not `order`), `added_at` (not `created_at`)
+- Completed tasks available at `GET /api/v1/tasks/completed/by_completion_date?since=&until=` (max 3-month range)
+- Webhook `event_data` uses v1 field names (`checked`, `added_at`, `inbox_project`)
+
+Internal normalized types (`TodoistProject`, `TodoistSection`, `TodoistTask`) are unchanged — mapping happens in the client.
+
 ## Webhook Design
 
 Todoist webhooks fire for: `item:added`, `item:updated`, `item:completed`, `item:uncompleted`, `item:deleted`, plus project/note/label events. Subscribe to all `item:*` events.
@@ -66,13 +82,74 @@ Todoist webhooks fire for: `item:added`, `item:updated`, `item:completed`, `item
 
 **Critical: recurring task completions.** `item:completed` fires for both one-off and recurring tasks, BUT for recurring tasks the `completed_at` field in the payload is **empty** (confirmed Todoist limitation). The task stays active with its due date advanced to the next occurrence. Our handler must read the old `due_date` from the DB before upserting, and use that as the completion timestamp in `task_completions`.
 
-Webhook registration is done manually in the [Todoist App Management Console](https://developer.todoist.com/appconsole.html). Subscribe to: `item:added`, `item:updated`, `item:completed`, `item:uncompleted`, `item:deleted`.
+**Webhook activation requires OAuth.** Unlike the seed script (which uses a personal API token), webhooks only fire for a user after they complete the OAuth flow against your app. For personal use, you must manually complete an OAuth authorize + token exchange with your own Todoist account. See the webhook connection steps below.
+
+Webhook registration is done manually in the [Todoist App Management Console](https://app.todoist.com/app/settings/integrations/app-management). Subscribe to: `item:added`, `item:updated`, `item:completed`, `item:uncompleted`, `item:deleted`.
 
 **Ordering: seed MUST run before webhook registration.** If a webhook fires for a task that doesn't exist in our DB yet, the `task_id` FK on `task_completions` would fail. To be safe, the webhook handler for `item:completed` and `item:updated` should also handle missing tasks: if the task isn't in the DB, fetch it from the Todoist API (`fetchActiveTasks` or by ID) and upsert it before processing the event. This makes the webhook self-healing if ordering is violated or a task was somehow missed by the seed.
 
+## Webhook Connection Steps
+
+Complete these **after** the seed has run successfully and Vercel is deployed.
+
+### Step A — Configure your app in Todoist App Management
+
+1. Go to [https://app.todoist.com/app/settings/integrations/app-management](https://app.todoist.com/app/settings/integrations/app-management)
+2. Open your Retrospection app (create one if needed — name it anything)
+3. Under **OAuth Redirect URIs**, add a temporary local redirect: `http://localhost:3000/oauth-callback` (you won't actually run a server; you just need the URL to capture the code)
+4. Copy your **Client ID** and **Client Secret** — set `TODOIST_CLIENT_SECRET` in Vercel env vars and your local `.env`
+5. Under **Webhooks**, set the webhook URL to your deployed Vercel endpoint:
+   ```
+   https://<your-app>.vercel.app/api/webhook/todoist
+   ```
+6. Subscribe to events: `item:added`, `item:updated`, `item:completed`, `item:uncompleted`, `item:deleted`, `project:added`, `project:updated`, `project:deleted`
+7. Save the app
+
+### Step B — Complete the OAuth flow to activate webhooks
+
+Webhooks only fire for users who have authorized your app via OAuth. For personal use, you authorize your own account.
+
+1. Build the authorize URL (replace `YOUR_CLIENT_ID`):
+   ```
+   https://app.todoist.com/oauth/authorize?client_id=YOUR_CLIENT_ID&scope=data:read_write&state=retrospection&redirect_uri=http://localhost:3000/oauth-callback
+   ```
+2. Open that URL in your browser — log in with your Todoist account and click **Agree**
+3. Todoist redirects to `http://localhost:3000/oauth-callback?code=XXXX&state=retrospection` — the page will fail to load (no server running), but **copy the `code` value from the URL**
+4. Exchange the code for a token. Run this in your terminal (replace the placeholders):
+   ```bash
+   curl -X POST https://api.todoist.com/oauth/access_token \
+     -d "client_id=YOUR_CLIENT_ID" \
+     -d "client_secret=YOUR_CLIENT_SECRET" \
+     -d "code=CODE_FROM_STEP_3" \
+     -d "redirect_uri=http://localhost:3000/oauth-callback"
+   ```
+5. The response includes an `access_token`. This is a permanent token for your account — you can use it as your `TODOIST_API_TOKEN` (it's equivalent to your personal token)
+6. Webhooks are now **activated** for your account
+
+### Step C — Verify webhooks are firing
+
+1. Deploy to Vercel (or confirm it's already deployed) with `TODOIST_CLIENT_SECRET` set
+2. Create a test task in Todoist → check the `webhook_events` table in Supabase for a new row
+3. Complete the task → check `task_completions` for a new row
+4. Check `sync_log` for webhook entries with `type = 'webhook'`
+
+### Step D — Set Vercel environment variables
+
+Make sure all five env vars are set in the Vercel project settings:
+
+| Variable | Where to get it |
+|---|---|
+| `DATABASE_URL` | Supabase → Settings → Database → Session pooler connection string |
+| `TODOIST_API_TOKEN` | Todoist Settings → Integrations → Developer → API token (or the OAuth access_token from Step B) |
+| `TODOIST_CLIENT_SECRET` | Todoist App Management → your app → Client Secret |
+| `API_KEY` | Generate: `openssl rand -hex 32` |
+| `TZ` | `America/Chicago` (or your timezone) |
+
+After setting env vars, redeploy so Vercel picks them up.
+
 ---
 
-## Step 1: Initialize Next.js project and deploy to Vercel
+## Step 1: Initialize Next.js project and deploy to Vercel ✅
 
 **Model: Sonnet** | Tests-alongside | New repo
 
@@ -88,7 +165,7 @@ Create the `retrospection` repo with Next.js (App Router), TypeScript strict mod
 
 ---
 
-## Step 2: Set up Supabase and Drizzle schema
+## Step 2: Set up Supabase and Drizzle schema ✅
 
 **Model: Sonnet** | Tests-alongside | Files: `src/db/*`, `drizzle.config.ts`
 
@@ -108,7 +185,7 @@ Create the `retrospection` repo with Next.js (App Router), TypeScript strict mod
 
 ---
 
-## Step 3: Build Todoist API client
+## Step 3: Build Todoist API client ✅
 
 **Model: Sonnet** | TDD | Files: `src/todoist/*`
 
@@ -127,7 +204,7 @@ Build a focused Todoist API client that returns raw API types (not mapped to Rem
 
 ---
 
-## Step 4: Build seed script (one-time backfill)
+## Step 4: Build seed script (one-time backfill) ✅
 
 **Model: Opus** | TDD | Files: `src/sync/*`, `scripts/seed.ts`
 
@@ -146,7 +223,7 @@ For **active recurring tasks** with due dates in the future: infer today's compl
 
 ---
 
-## Step 5: Build webhook endpoint
+## Step 5: Build webhook endpoint ✅
 
 **Model: Opus** | TDD | Files: `app/api/webhook/todoist/route.ts`, `src/sync/webhook.ts`
 
@@ -178,7 +255,7 @@ Also handle `project:added`, `project:updated`, `project:deleted`.
 
 ---
 
-## Step 6: Build simple REST API routes
+## Step 6: Build simple REST API routes ✅
 
 **Model: Sonnet** | TDD | Files: `app/api/*`, `src/api/*`
 
@@ -212,7 +289,7 @@ Add a few Next.js API routes for basic programmatic data access. These are inten
 
 ---
 
-## Step 7: End-to-end verification
+## Step 7: End-to-end verification ✅
 
 **Model: Sonnet** | Tests-alongside
 

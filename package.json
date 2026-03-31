@@ -1,0 +1,33 @@
+{
+  "name": "retrospection",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "drizzle-orm": "^0.45.2",
+    "next": "^15.2.4",
+    "postgres": "^3.4.8",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^15.2.4",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

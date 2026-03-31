@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"Add retrospection backend plan:*)",
+      "Bash(gh repo:*)",
+      "Bash(git checkout:*)",
+      "Bash(npm install:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run:*)",
+      "Bash(git commit -m \"Step 1: Initialize Next.js project with health check and CI:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr:*)",
+      "Bash(git commit -m \"Step 2: Supabase/Drizzle schema and DB client:*)",
+      "Bash(git commit -m \"Step 3: Todoist API client \\(TDD\\):*)",
+      "Bash(git commit -m \"Step 4: Seed script with upsert functions \\(TDD\\):*)",
+      "Bash(git commit -m \"Step 6: REST API routes with Bearer auth middleware \\(TDD\\):*)",
+      "Bash(git commit -m \"Step 7: E2E pipeline test, README, and env.example:*)",
+      "Bash(git commit -m \"Handle 410 Gone from projects and sections API endpoints:*)",
+      "Bash(git commit -m \"Switch Todoist client from REST v2 to Sync API v9:*)",
+      "Bash(git commit -m \"Use single syncAll call instead of 3 parallel requests:*)",
+      "Bash(curl -s -L \"https://developer.todoist.com/api/v1/\")",
+      "WebFetch(domain:developer.todoist.com)",
+      "Bash(curl -s \"https://developer.todoist.com/api/v1/\")",
+      "Bash(curl -s -L \"https://developer.todoist.com/api/v1/openapi.json\" -o /tmp/todoist-openapi.json)",
+      "Read(//tmp/**)",
+      "Bash(git commit -m \"Migrate to Todoist API v1 \\(REST v2 and Sync v9 deprecated\\):*)",
+      "Bash(git commit -m \"Restore completed tasks backfill in seed \\(available in API v1\\):*)",
+      "Bash(git commit -m \"Update plan with API v1 migration notes and detailed webhook connection steps:*)"
+    ]
+  }
+}
