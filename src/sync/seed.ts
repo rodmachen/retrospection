@@ -51,14 +51,16 @@ export async function runSeed(
         timeZone: timezone,
       });
 
-      // Upsert a minimal task row for completed tasks not in active list
+      // Upsert a minimal task row for completed tasks not in active list.
+      // Null out section_id — the section may have been deleted/archived
+      // and wouldn't be in our sections table (FK would fail).
       await upsertTasks(db, [
         {
           id: ct.task_id,
           content: ct.content,
           description: "",
           project_id: ct.project_id,
-          section_id: ct.section_id,
+          section_id: null,
           parent_id: null,
           priority: 1,
           labels: [],
