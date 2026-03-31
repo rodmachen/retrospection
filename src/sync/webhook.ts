@@ -137,13 +137,21 @@ async function handleItemCompleted(
       .from(tasks)
       .where(eq(tasks.id, taskId));
 
-    const oldDueDate = existingRows[0]?.dueDate ?? getTodayInTimezone(timezone);
+    const oldDueDate = existingRows[0]?.dueDate ?? null;
+    const incomingDueDate = (eventData.due as { date?: string } | null)?.date ?? null;
 
-    // Insert completion with the old due date
+    // If DB due date is stale (matches incoming advanced date) or task not found,
+    // fall back to today. Otherwise use the old due date (normal case).
+    const completedDate =
+      oldDueDate && oldDueDate !== incomingDueDate
+        ? oldDueDate
+        : getTodayInTimezone(timezone);
+
+    // Insert completion with the determined date
     await insertTaskCompletion(db, {
       taskId,
       completedAt: null,
-      completedDate: oldDueDate,
+      completedDate,
     });
 
     // Upsert task with new advanced due date (DO NOT mark as completed)

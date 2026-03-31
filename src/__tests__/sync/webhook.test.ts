@@ -247,6 +247,107 @@ describe("processWebhookEvent — item:completed (recurring)", () => {
   });
 });
 
+describe("processWebhookEvent — item:completed (recurring, stale DB)", () => {
+  it("falls back to today when old dueDate equals incoming due.date", async () => {
+    vi.useFakeTimers();
+    // Today is June 16, but DB and incoming due.date are both June 15 (stale)
+    vi.setSystemTime(new Date("2024-06-16T18:00:00Z"));
+
+    const db = createMockDb();
+    // Mock: task exists but dueDate matches incoming due.date (stale)
+    db.select = vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => [{ dueDate: "2024-06-15" }]),
+      })),
+    }));
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:completed",
+        event_data: {
+          id: "t1",
+          content: "Daily standup",
+          description: "",
+          project_id: "p1",
+          section_id: null,
+          parent_id: null,
+          priority: 1,
+          labels: [],
+          due: { date: "2024-06-15", is_recurring: true, string: "every day" },
+          checked: false,
+          completed_at: null,
+          added_at: "2024-01-01T00:00:00Z",
+        },
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    // Should fall back to today (2024-06-16 in Chicago), NOT use stale "2024-06-15"
+    expect(insertTaskCompletion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        taskId: "t1",
+        completedAt: null,
+        completedDate: "2024-06-16",
+      })
+    );
+
+    vi.useRealTimers();
+  });
+});
+
+describe("processWebhookEvent — item:completed (recurring, task not in DB)", () => {
+  it("falls back to today when task not found in DB", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-06-15T18:00:00Z"));
+
+    const db = createMockDb();
+    // Mock: task NOT in DB (empty result)
+    db.select = vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => []),
+      })),
+    }));
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:completed",
+        event_data: {
+          id: "t1",
+          content: "Daily standup",
+          description: "",
+          project_id: "p1",
+          section_id: null,
+          parent_id: null,
+          priority: 1,
+          labels: [],
+          due: { date: "2024-06-16", is_recurring: true, string: "every day" },
+          checked: false,
+          completed_at: null,
+          added_at: "2024-01-01T00:00:00Z",
+        },
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    // Should fall back to today
+    expect(insertTaskCompletion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        taskId: "t1",
+        completedAt: null,
+        completedDate: "2024-06-15",
+      })
+    );
+
+    vi.useRealTimers();
+  });
+});
+
 describe("processWebhookEvent — item:uncompleted", () => {
   it("deletes today's task_completions row and marks task not completed", async () => {
     const db = createMockDb();
