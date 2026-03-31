@@ -1,9 +1,8 @@
 import crypto from "crypto";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { tasks, taskCompletions, projects, webhookEvents, syncLog } from "../db/schema";
 import type { Db } from "../db/client";
-import { upsertTasks, upsertProjects, insertTaskCompletion, mapTodoistTask } from "./upsert";
-import { fetchActiveTasks } from "../todoist/client";
+import { upsertTasks, upsertProjects, insertTaskCompletion } from "./upsert";
 import type { TodoistTask, TodoistProject } from "../todoist/types";
 
 export function verifyHmac(
@@ -15,10 +14,10 @@ export function verifyHmac(
     .createHmac("sha256", secret)
     .update(rawBody)
     .digest("base64");
-  return crypto.timingSafeEqual(
-    Buffer.from(computed),
-    Buffer.from(signature)
-  );
+  const computedBuf = Buffer.from(computed);
+  const signatureBuf = Buffer.from(signature);
+  if (computedBuf.byteLength !== signatureBuf.byteLength) return false;
+  return crypto.timingSafeEqual(computedBuf, signatureBuf);
 }
 
 export interface WebhookPayload {
@@ -27,32 +26,29 @@ export interface WebhookPayload {
 }
 
 /**
- * Returns true if the delivery ID was already processed (duplicate).
- * Inserts the delivery ID if new.
+ * Returns true if the delivery ID has already been recorded (duplicate).
  */
-export async function checkAndRecordDelivery(
+export async function isDuplicateDelivery(
+  db: Db,
+  deliveryId: string
+): Promise<boolean> {
+  const rows = await db
+    .select({ deliveryId: webhookEvents.deliveryId })
+    .from(webhookEvents)
+    .where(eq(webhookEvents.deliveryId, deliveryId))
+    .limit(1);
+  return rows.length > 0;
+}
+
+/**
+ * Records a successfully processed delivery ID.
+ */
+export async function recordDelivery(
   db: Db,
   deliveryId: string,
   eventType: string
-): Promise<boolean> {
-  try {
-    await db.insert(webhookEvents).values({
-      deliveryId,
-      eventType,
-    });
-    return false; // New delivery, not a duplicate
-  } catch (error: unknown) {
-    // Unique constraint violation = duplicate delivery
-    if (
-      error instanceof Error &&
-      (error.message.includes("unique") ||
-        error.message.includes("duplicate") ||
-        error.message.includes("23505"))
-    ) {
-      return true;
-    }
-    throw error;
-  }
+): Promise<void> {
+  await db.insert(webhookEvents).values({ deliveryId, eventType });
 }
 
 function getTodayInTimezone(timezone: string): string {
@@ -78,7 +74,7 @@ export async function processWebhookEvent(
       break;
 
     case "item:uncompleted":
-      await handleItemUncompleted(db, event_data, timezone);
+      await handleItemUncompleted(db, event_data);
       break;
 
     case "item:deleted":
@@ -100,12 +96,13 @@ export async function processWebhookEvent(
   }
 
   // Log to sync_log
+  const tasksSynced = event_name.startsWith("item:") ? 1 : 0;
   await db.insert(syncLog).values({
     type: "webhook",
     startedAt: new Date(),
     completedAt: new Date(),
     status: "success",
-    tasksSynced: 1,
+    tasksSynced,
     metadata: { event_name, task_id: event_data.id },
   });
 }
@@ -176,21 +173,28 @@ async function handleItemCompleted(
 
 async function handleItemUncompleted(
   db: Db,
-  eventData: Record<string, unknown>,
-  timezone: string
+  eventData: Record<string, unknown>
 ): Promise<void> {
   const taskId = String(eventData.id);
-  const today = getTodayInTimezone(timezone);
 
-  // Delete the task_completions row for today
-  await db
-    .delete(taskCompletions)
-    .where(
-      and(
-        eq(taskCompletions.taskId, taskId),
-        eq(taskCompletions.completedDate, today)
-      )
-    );
+  // Delete the most recent completion for this task (may not be today if completed yesterday)
+  const latest = await db
+    .select({ completedDate: taskCompletions.completedDate })
+    .from(taskCompletions)
+    .where(eq(taskCompletions.taskId, taskId))
+    .orderBy(desc(taskCompletions.completedDate))
+    .limit(1);
+
+  if (latest.length > 0) {
+    await db
+      .delete(taskCompletions)
+      .where(
+        and(
+          eq(taskCompletions.taskId, taskId),
+          eq(taskCompletions.completedDate, latest[0].completedDate)
+        )
+      );
+  }
 
   // Upsert task as not completed
   const task = eventDataToTodoistTask(eventData);

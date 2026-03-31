@@ -23,12 +23,12 @@ export async function upsertProjects(db: Db, items: TodoistProject[]) {
     )
     .onConflictDoUpdate({
       target: projects.id,
-      set: {
-        name: projects.name,
-        isInbox: projects.isInbox,
-        color: projects.color,
+      set: (excluded) => ({
+        name: excluded.name,
+        isInbox: excluded.isInbox,
+        color: excluded.color,
         updatedAt: new Date(),
-      },
+      }),
     });
 }
 
@@ -48,12 +48,12 @@ export async function upsertSections(db: Db, items: TodoistSection[]) {
     )
     .onConflictDoUpdate({
       target: sections.id,
-      set: {
-        name: sections.name,
-        projectId: sections.projectId,
-        order: sections.order,
+      set: (excluded) => ({
+        name: excluded.name,
+        projectId: excluded.projectId,
+        order: excluded.order,
         updatedAt: new Date(),
-      },
+      }),
     });
 }
 
@@ -88,24 +88,24 @@ export async function upsertTasks(db: Db, items: TodoistTask[]) {
     .values(items.map(mapTodoistTask))
     .onConflictDoUpdate({
       target: tasks.id,
-      set: {
-        content: tasks.content,
-        description: tasks.description,
-        projectId: tasks.projectId,
-        sectionId: tasks.sectionId,
-        parentId: tasks.parentId,
-        priority: tasks.priority,
-        labels: tasks.labels,
-        dueDate: tasks.dueDate,
-        dueIsRecurring: tasks.dueIsRecurring,
-        dueString: tasks.dueString,
-        dueTimezone: tasks.dueTimezone,
-        isCompleted: tasks.isCompleted,
-        completedAt: tasks.completedAt,
+      set: (excluded) => ({
+        content: excluded.content,
+        description: excluded.description,
+        projectId: excluded.projectId,
+        sectionId: excluded.sectionId,
+        parentId: excluded.parentId,
+        priority: excluded.priority,
+        labels: excluded.labels,
+        dueDate: excluded.dueDate,
+        dueIsRecurring: excluded.dueIsRecurring,
+        dueString: excluded.dueString,
+        dueTimezone: excluded.dueTimezone,
+        isCompleted: excluded.isCompleted,
+        completedAt: excluded.completedAt,
         lastSyncedAt: new Date(),
-        rawJson: tasks.rawJson,
+        rawJson: excluded.rawJson,
         updatedAt: new Date(),
-      },
+      }),
     });
 }
 

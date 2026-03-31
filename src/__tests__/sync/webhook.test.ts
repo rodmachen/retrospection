@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { verifyHmac, checkAndRecordDelivery, processWebhookEvent } from "../../sync/webhook";
+import { verifyHmac, isDuplicateDelivery, recordDelivery, processWebhookEvent } from "../../sync/webhook";
 import crypto from "crypto";
 
 // Mock the upsert module
@@ -45,48 +45,60 @@ describe("verifyHmac", () => {
   });
 });
 
-describe("checkAndRecordDelivery", () => {
-  it("returns false for new delivery ID", async () => {
+describe("isDuplicateDelivery", () => {
+  it("returns false when delivery ID not found", async () => {
+    const db = {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn(() => Promise.resolve([])),
+          })),
+        })),
+      })),
+    };
+
+    const result = await isDuplicateDelivery(db as never, "d1");
+    expect(result).toBe(false);
+  });
+
+  it("returns true when delivery ID already exists", async () => {
+    const db = {
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn(() => Promise.resolve([{ deliveryId: "d1" }])),
+          })),
+        })),
+      })),
+    };
+
+    const result = await isDuplicateDelivery(db as never, "d1");
+    expect(result).toBe(true);
+  });
+});
+
+describe("recordDelivery", () => {
+  it("inserts the delivery ID", async () => {
     const db = {
       insert: vi.fn(() => ({
         values: vi.fn(),
       })),
     };
 
-    const result = await checkAndRecordDelivery(db as never, "d1", "item:added");
-    expect(result).toBe(false);
+    await recordDelivery(db as never, "d1", "item:added");
     expect(db.insert).toHaveBeenCalled();
-  });
-
-  it("returns true for duplicate delivery ID (unique constraint violation)", async () => {
-    const db = {
-      insert: vi.fn(() => ({
-        values: vi.fn(() => {
-          throw new Error("unique constraint violation 23505");
-        }),
-      })),
-    };
-
-    const result = await checkAndRecordDelivery(db as never, "d1", "item:added");
-    expect(result).toBe(true);
-  });
-
-  it("re-throws non-duplicate errors", async () => {
-    const db = {
-      insert: vi.fn(() => ({
-        values: vi.fn(() => {
-          throw new Error("connection refused");
-        }),
-      })),
-    };
-
-    await expect(
-      checkAndRecordDelivery(db as never, "d1", "item:added")
-    ).rejects.toThrow("connection refused");
   });
 });
 
 function createMockDb() {
+  const selectChain: Record<string, unknown> = {};
+  const chainMethods = ["from", "where", "orderBy", "limit"];
+  for (const m of chainMethods) {
+    selectChain[m] = vi.fn(() => selectChain);
+  }
+  selectChain.then = (resolve: (v: unknown) => unknown) =>
+    Promise.resolve([]).then(resolve);
+
   return {
     insert: vi.fn(() => ({
       values: vi.fn(() => ({
@@ -95,11 +107,7 @@ function createMockDb() {
         onConflictDoUpdate: vi.fn(),
       })),
     })),
-    select: vi.fn(() => ({
-      from: vi.fn(() => ({
-        where: vi.fn(() => []),
-      })),
-    })),
+    select: vi.fn(() => selectChain),
     update: vi.fn(() => ({
       set: vi.fn(() => ({
         where: vi.fn(),
@@ -242,6 +250,14 @@ describe("processWebhookEvent — item:completed (recurring)", () => {
 describe("processWebhookEvent — item:uncompleted", () => {
   it("deletes today's task_completions row and marks task not completed", async () => {
     const db = createMockDb();
+    // Return a completion row so the delete branch fires
+    const selectChain: Record<string, unknown> = {};
+    for (const m of ["from", "where", "orderBy", "limit"]) {
+      selectChain[m] = vi.fn(() => selectChain);
+    }
+    selectChain.then = (resolve: (v: unknown) => unknown) =>
+      Promise.resolve([{ completedDate: "2024-06-15" }]).then(resolve);
+    db.select = vi.fn(() => selectChain) as typeof db.select;
 
     await processWebhookEvent(
       db as never,

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db/client";
 import {
   verifyHmac,
-  checkAndRecordDelivery,
+  isDuplicateDelivery,
+  recordDelivery,
   processWebhookEvent,
 } from "@/sync/webhook";
 import type { WebhookPayload } from "@/sync/webhook";
@@ -39,19 +40,20 @@ export async function POST(request: NextRequest) {
 
   const db = getDb();
 
-  const payload: WebhookPayload = JSON.parse(rawBody);
-  const isDuplicate = await checkAndRecordDelivery(
-    db,
-    deliveryId,
-    payload.event_name
-  );
+  let payload: WebhookPayload;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
-  if (isDuplicate) {
+  if (await isDuplicateDelivery(db, deliveryId)) {
     return NextResponse.json({ status: "ok", duplicate: true });
   }
 
-  // Process the event
+  // Process first, then record delivery so retries aren't permanently blocked on failure
   await processWebhookEvent(db, payload, timezone, todoistToken);
+  await recordDelivery(db, deliveryId, payload.event_name);
 
   return NextResponse.json({ status: "ok" });
 }

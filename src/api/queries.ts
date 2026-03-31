@@ -35,7 +35,7 @@ export async function queryTaskById(db: Db, id: string) {
   const rows = await db
     .select()
     .from(tasks)
-    .where(eq(tasks.id, id))
+    .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
     .limit(1);
   return rows[0] ?? null;
 }

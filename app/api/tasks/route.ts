@@ -12,11 +12,9 @@ export async function GET(request: NextRequest) {
         : undefined,
     projectId: searchParams.get("projectId") ?? undefined,
     limit: searchParams.has("limit")
-      ? Math.min(parseInt(searchParams.get("limit")!, 10), 200)
+      ? Math.min(parseInt(searchParams.get("limit")!, 10) || 50, 200)
       : 50,
-    offset: searchParams.has("offset")
-      ? parseInt(searchParams.get("offset")!, 10)
-      : 0,
+    offset: parseInt(searchParams.get("offset") ?? "0", 10) || 0,
   };
 
   const db = getDb();

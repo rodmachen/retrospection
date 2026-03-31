@@ -14,7 +14,7 @@ import {
 import { relations } from "drizzle-orm";
 
 export const projects = pgTable("projects", {
-  id: varchar("id", { length: 20 }).primaryKey(),
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
   isInbox: boolean("is_inbox").notNull().default(false),
   color: varchar("color", { length: 50 }),
@@ -29,8 +29,8 @@ export const projects = pgTable("projects", {
 });
 
 export const sections = pgTable("sections", {
-  id: varchar("id", { length: 20 }).primaryKey(),
-  projectId: varchar("project_id", { length: 20 })
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
     .notNull()
     .references(() => projects.id),
   name: text("name").notNull(),
@@ -46,16 +46,12 @@ export const sections = pgTable("sections", {
 export const tasks = pgTable(
   "tasks",
   {
-    id: varchar("id", { length: 20 }).primaryKey(),
+    id: text("id").primaryKey(),
     content: text("content").notNull(),
     description: text("description"),
-    projectId: varchar("project_id", { length: 20 }).references(
-      () => projects.id
-    ),
-    sectionId: varchar("section_id", { length: 20 }).references(
-      () => sections.id
-    ),
-    parentId: varchar("parent_id", { length: 20 }),
+    projectId: text("project_id").references(() => projects.id),
+    sectionId: text("section_id").references(() => sections.id),
+    parentId: text("parent_id"),
     priority: integer("priority").notNull().default(1),
     labels: text("labels").array().notNull().default([]),
     dueDate: date("due_date"),
@@ -92,7 +88,7 @@ export const taskCompletions = pgTable(
   "task_completions",
   {
     id: serial("id").primaryKey(),
-    taskId: varchar("task_id", { length: 20 })
+    taskId: text("task_id")
       .notNull()
       .references(() => tasks.id),
     completedAt: timestamp("completed_at", { withTimezone: true }),
