@@ -5,7 +5,11 @@ import {
   queryProjects,
   queryCompletionStats,
   queryLatestSync,
+  nestSubtasks,
 } from "../../api/queries";
+import type { tasks } from "../../db/schema";
+
+type TaskRow = typeof tasks.$inferSelect;
 
 const TABLE_NAME_SYM = Symbol.for("drizzle:Name");
 
@@ -38,7 +42,7 @@ function createMockDb(returnValue: unknown = []) {
   };
 }
 
-const sampleTask = {
+const sampleTask: TaskRow = {
   id: "t1",
   content: "Buy milk",
   description: null,
@@ -54,6 +58,7 @@ const sampleTask = {
   isCompleted: false,
   completedAt: null,
   deletedAt: null,
+  todoistCreatedAt: null,
   firstSeenAt: new Date(),
   lastSyncedAt: new Date(),
   rawJson: null,
@@ -132,6 +137,75 @@ describe("queryCompletionStats", () => {
     const db = createMockDb(stats);
     const result = await queryCompletionStats(db as never, 7);
     expect(result).toEqual(stats);
+  });
+});
+
+describe("nestSubtasks", () => {
+  const makeTask = (overrides: Partial<typeof sampleTask>) => ({
+    ...sampleTask,
+    ...overrides,
+  });
+
+  it("returns empty array for empty input", () => {
+    expect(nestSubtasks([])).toEqual([]);
+  });
+
+  it("returns parent tasks with empty subtasks array when no subtasks", () => {
+    const parent = makeTask({ id: "p1", parentId: null });
+    const result = nestSubtasks([parent]);
+    expect(result).toEqual([{ ...parent, subtasks: [] }]);
+  });
+
+  it("nests subtasks under their parent", () => {
+    const parent = makeTask({ id: "p1", parentId: null });
+    const child = makeTask({ id: "c1", parentId: "p1" });
+    const result = nestSubtasks([parent, child]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("p1");
+    expect(result[0].subtasks).toEqual([{ ...child, subtasks: [] }]);
+  });
+
+  it("nests multiple subtasks under the same parent", () => {
+    const parent = makeTask({ id: "p1", parentId: null });
+    const child1 = makeTask({ id: "c1", parentId: "p1" });
+    const child2 = makeTask({ id: "c2", parentId: "p1" });
+    const result = nestSubtasks([parent, child1, child2]);
+    expect(result).toHaveLength(1);
+    expect(result[0].subtasks).toHaveLength(2);
+  });
+
+  it("places orphan subtasks (parent not in array) at top level with empty subtasks", () => {
+    const orphan = makeTask({ id: "c1", parentId: "missing-parent" });
+    const result = nestSubtasks([orphan]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("c1");
+    expect(result[0].subtasks).toEqual([]);
+  });
+
+  it("handles multiple parents each with their own subtasks", () => {
+    const parent1 = makeTask({ id: "p1", parentId: null });
+    const parent2 = makeTask({ id: "p2", parentId: null });
+    const child1 = makeTask({ id: "c1", parentId: "p1" });
+    const child2 = makeTask({ id: "c2", parentId: "p2" });
+    const result = nestSubtasks([parent1, parent2, child1, child2]);
+    expect(result).toHaveLength(2);
+    const r1 = result.find((t) => t.id === "p1")!;
+    const r2 = result.find((t) => t.id === "p2")!;
+    expect(r1.subtasks.map((s) => s.id)).toEqual(["c1"]);
+    expect(r2.subtasks.map((s) => s.id)).toEqual(["c2"]);
+  });
+
+  it("nests grandchildren under their parent child (multi-level)", () => {
+    const parent = makeTask({ id: "p1", parentId: null });
+    const child = makeTask({ id: "c1", parentId: "p1" });
+    const grandchild = makeTask({ id: "gc1", parentId: "c1" });
+    const result = nestSubtasks([parent, child, grandchild]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("p1");
+    expect(result[0].subtasks).toHaveLength(1);
+    expect(result[0].subtasks[0].id).toBe("c1");
+    expect(result[0].subtasks[0].subtasks).toHaveLength(1);
+    expect(result[0].subtasks[0].subtasks[0].id).toBe("gc1");
   });
 });
 

@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
         ? searchParams.get("completed") === "true"
         : undefined,
     projectId: searchParams.get("projectId") ?? undefined,
+    nested: searchParams.get("nested") === "true",
     limit: searchParams.has("limit")
       ? Math.min(parseInt(searchParams.get("limit")!, 10) || 50, 200)
       : 50,

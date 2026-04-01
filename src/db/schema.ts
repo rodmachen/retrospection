@@ -81,6 +81,7 @@ export const tasks = pgTable(
     index("tasks_completed_idx").on(table.isCompleted, table.completedAt),
     index("tasks_due_date_idx").on(table.dueDate),
     index("tasks_section_id_idx").on(table.sectionId),
+    index("tasks_parent_id_idx").on(table.parentId),
   ]
 );
 
