@@ -76,8 +76,12 @@ export async function queryTasks(db: Db, filters: TaskFilters) {
   const allTasks = [...parentRows];
   let currentIds = parentRows.map((t) => t.id);
 
-  // Iteratively fetch the next level of descendants until none remain
-  while (currentIds.length > 0) {
+  // Iteratively fetch the next level of descendants until none remain.
+  // Capped at 5 levels to guard against circular parentId references in corrupted data.
+  // Note: the completed filter applies only to parent tasks. Child tasks are returned
+  // regardless of completion status so parents have full context (e.g., ?completed=false
+  // will return incomplete parents but their subtasks may include completed items).
+  for (let depth = 0; depth < 5 && currentIds.length > 0; depth++) {
     const childRows = await db
       .select()
       .from(tasks)
