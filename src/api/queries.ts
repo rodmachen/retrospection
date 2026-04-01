@@ -11,15 +11,12 @@ export interface TaskFilters {
 }
 
 type TaskRow = typeof tasks.$inferSelect;
-export type NestedTask = TaskRow & { subtasks: TaskRow[] };
+export type NestedTask = TaskRow & { subtasks: NestedTask[] };
 
 export function nestSubtasks(flatTasks: TaskRow[]): NestedTask[] {
   const byId = new Map<string, NestedTask>();
-  const parentIds = new Set(
-    flatTasks.filter((t) => t.parentId === null).map((t) => t.id)
-  );
 
-  // First pass: build map of all tasks with empty subtasks
+  // First pass: build map of all tasks with empty subtasks arrays
   for (const task of flatTasks) {
     byId.set(task.id, { ...task, subtasks: [] });
   }
@@ -28,11 +25,11 @@ export function nestSubtasks(flatTasks: TaskRow[]): NestedTask[] {
 
   for (const task of flatTasks) {
     const node = byId.get(task.id)!;
-    if (task.parentId !== null && parentIds.has(task.parentId)) {
-      // Attach to parent
-      byId.get(task.parentId)!.subtasks.push(task);
-    } else if (task.parentId === null || !parentIds.has(task.parentId)) {
-      // Top-level: either a real parent or an orphan
+    if (task.parentId !== null && byId.has(task.parentId)) {
+      // Attach to parent — works at any nesting depth
+      byId.get(task.parentId)!.subtasks.push(node);
+    } else {
+      // Top-level: root task (parentId === null) or orphan (parent not in set)
       result.push(node);
     }
   }
@@ -63,7 +60,8 @@ export async function queryTasks(db: Db, filters: TaskFilters) {
       .offset(offset);
   }
 
-  // Nested mode: fetch parent tasks first, then their subtasks
+  // Nested mode: fetch root tasks first, then all descendants iteratively.
+  // This handles any nesting depth (Todoist supports up to 4 levels).
   const parentConditions = [...conditions, isNull(tasks.parentId)];
   const parentRows = await db
     .select()
@@ -75,13 +73,23 @@ export async function queryTasks(db: Db, filters: TaskFilters) {
 
   if (parentRows.length === 0) return [];
 
-  const parentIds = parentRows.map((t) => t.id);
-  const subtaskRows = await db
-    .select()
-    .from(tasks)
-    .where(and(inArray(tasks.parentId, parentIds), isNull(tasks.deletedAt)));
+  const allTasks = [...parentRows];
+  let currentIds = parentRows.map((t) => t.id);
 
-  return nestSubtasks([...parentRows, ...subtaskRows]);
+  // Iteratively fetch the next level of descendants until none remain
+  while (currentIds.length > 0) {
+    const childRows = await db
+      .select()
+      .from(tasks)
+      .where(and(inArray(tasks.parentId, currentIds), isNull(tasks.deletedAt)))
+      .orderBy(tasks.createdAt);
+
+    if (childRows.length === 0) break;
+    allTasks.push(...childRows);
+    currentIds = childRows.map((t) => t.id);
+  }
+
+  return nestSubtasks(allTasks);
 }
 
 export async function queryTaskById(db: Db, id: string) {

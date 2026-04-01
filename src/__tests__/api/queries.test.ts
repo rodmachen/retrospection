@@ -162,7 +162,7 @@ describe("nestSubtasks", () => {
     const result = nestSubtasks([parent, child]);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("p1");
-    expect(result[0].subtasks).toEqual([child]);
+    expect(result[0].subtasks).toEqual([{ ...child, subtasks: [] }]);
   });
 
   it("nests multiple subtasks under the same parent", () => {
@@ -193,6 +193,19 @@ describe("nestSubtasks", () => {
     const r2 = result.find((t) => t.id === "p2")!;
     expect(r1.subtasks.map((s) => s.id)).toEqual(["c1"]);
     expect(r2.subtasks.map((s) => s.id)).toEqual(["c2"]);
+  });
+
+  it("nests grandchildren under their parent child (multi-level)", () => {
+    const parent = makeTask({ id: "p1", parentId: null });
+    const child = makeTask({ id: "c1", parentId: "p1" });
+    const grandchild = makeTask({ id: "gc1", parentId: "c1" });
+    const result = nestSubtasks([parent, child, grandchild]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("p1");
+    expect(result[0].subtasks).toHaveLength(1);
+    expect(result[0].subtasks[0].id).toBe("c1");
+    expect(result[0].subtasks[0].subtasks).toHaveLength(1);
+    expect(result[0].subtasks[0].subtasks[0].id).toBe("gc1");
   });
 });
 

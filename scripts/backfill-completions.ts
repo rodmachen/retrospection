@@ -30,17 +30,22 @@ async function main() {
   console.log(`Backfilling ${MISSING_COMPLETIONS.length} missing completions...`);
 
   for (const entry of MISSING_COMPLETIONS) {
-    // insertTaskCompletion uses onConflictDoNothing — idempotent
-    await insertTaskCompletion(db, {
-      taskId: entry.taskId,
-      completedAt: null,
-      completedDate: entry.date,
-    });
-    console.log(`  ✓ ${entry.date}  ${entry.task}`);
-    inserted++;
+    try {
+      // insertTaskCompletion uses onConflictDoNothing — idempotent
+      await insertTaskCompletion(db, {
+        taskId: entry.taskId,
+        completedAt: null,
+        completedDate: entry.date,
+      });
+      console.log(`  ✓ ${entry.date}  ${entry.task}`);
+      inserted++;
+    } catch (err) {
+      console.error(`  ✗ ${entry.date}  ${entry.task} — ${err}`);
+      skipped++;
+    }
   }
 
-  console.log(`\nDone: ${inserted} rows attempted (duplicates silently skipped by DB).`);
+  console.log(`\nDone: ${inserted} inserted, ${skipped} failed.`);
   console.log("Run again to verify idempotency — output should be the same with 0 new inserts.");
 
   process.exit(0);
