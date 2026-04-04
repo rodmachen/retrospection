@@ -1,5 +1,5 @@
 import { eq, and, desc, count, sql, isNull, inArray } from "drizzle-orm";
-import { tasks, projects, taskCompletions, syncLog } from "../db/schema";
+import { tasks, projects, taskCompletions, sections, syncLog } from "../db/schema";
 import type { Db } from "../db/client";
 
 export interface TaskFilters {
@@ -137,6 +137,71 @@ export async function queryCompletionStats(db: Db, days: number) {
     )
     .groupBy(taskCompletions.completedDate)
     .orderBy(desc(taskCompletions.completedDate));
+}
+
+export async function queryHabitCompletions(
+  db: Db,
+  projectName: string,
+  startDate: string,
+  endDate: string
+) {
+  const rows = await db
+    .select({
+      taskId: tasks.id,
+      content: tasks.content,
+      sectionName: sections.name,
+      labels: tasks.labels,
+      description: tasks.description,
+      isCompleted: tasks.isCompleted,
+      deletedAt: tasks.deletedAt,
+      completedDate: taskCompletions.completedDate,
+    })
+    .from(tasks)
+    .innerJoin(projects, and(eq(tasks.projectId, projects.id), eq(projects.name, projectName)))
+    .leftJoin(sections, eq(tasks.sectionId, sections.id))
+    .leftJoin(
+      taskCompletions,
+      and(
+        eq(taskCompletions.taskId, tasks.id),
+        sql`${taskCompletions.completedDate} >= ${startDate}::date`,
+        sql`${taskCompletions.completedDate} <= ${endDate}::date`
+      )
+    )
+    .where(and(isNull(tasks.parentId), isNull(tasks.deletedAt)))
+    .orderBy(tasks.id, taskCompletions.completedDate);
+
+  type HabitRow = {
+    taskId: string;
+    content: string;
+    sectionName: string | null;
+    labels: string[];
+    description: string | null;
+    isCompleted: boolean;
+    deletedAt: Date | null;
+    completionDates: string[];
+  };
+
+  const byTaskId = new Map<string, HabitRow>();
+
+  for (const row of rows) {
+    if (!byTaskId.has(row.taskId)) {
+      byTaskId.set(row.taskId, {
+        taskId: row.taskId,
+        content: row.content,
+        sectionName: row.sectionName ?? null,
+        labels: row.labels,
+        description: row.description ?? null,
+        isCompleted: row.isCompleted,
+        deletedAt: row.deletedAt ?? null,
+        completionDates: [],
+      });
+    }
+    if (row.completedDate !== null) {
+      byTaskId.get(row.taskId)!.completionDates.push(row.completedDate);
+    }
+  }
+
+  return Array.from(byTaskId.values());
 }
 
 export async function queryLatestSync(db: Db) {

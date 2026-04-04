@@ -6,6 +6,7 @@ import {
   queryCompletionStats,
   queryLatestSync,
   nestSubtasks,
+  queryHabitCompletions,
 } from "../../api/queries";
 import type { tasks } from "../../db/schema";
 
@@ -26,6 +27,7 @@ function createMockDb(returnValue: unknown = []) {
     offset: vi.fn().mockReturnThis(),
     orderBy: vi.fn().mockReturnThis(),
     leftJoin: vi.fn().mockReturnThis(),
+    innerJoin: vi.fn().mockReturnThis(),
     groupBy: vi.fn().mockReturnThis(),
     then: vi.fn((resolve: (v: unknown) => void) => resolve(returnValue)),
   };
@@ -206,6 +208,51 @@ describe("nestSubtasks", () => {
     expect(result[0].subtasks[0].id).toBe("c1");
     expect(result[0].subtasks[0].subtasks).toHaveLength(1);
     expect(result[0].subtasks[0].subtasks[0].id).toBe("gc1");
+  });
+});
+
+describe("queryHabitCompletions", () => {
+  it("returns empty array when no tasks", async () => {
+    const db = createMockDb([]);
+    const result = await queryHabitCompletions(db as never, "Habits", "2026-03-29", "2026-04-04");
+    expect(result).toEqual([]);
+  });
+
+  it("returns task with completion dates grouped", async () => {
+    const rows = [
+      { taskId: "t1", content: "Cardio", sectionName: "Workout", labels: ["Workout"], description: null, isCompleted: false, deletedAt: null, completedDate: "2026-03-29" },
+      { taskId: "t1", content: "Cardio", sectionName: "Workout", labels: ["Workout"], description: null, isCompleted: false, deletedAt: null, completedDate: "2026-04-01" },
+    ];
+    const db = createMockDb(rows);
+    const result = await queryHabitCompletions(db as never, "Habits", "2026-03-29", "2026-04-04");
+    expect(result).toHaveLength(1);
+    expect(result[0].taskId).toBe("t1");
+    expect(result[0].completionDates).toEqual(["2026-03-29", "2026-04-01"]);
+  });
+
+  it("returns task with empty completionDates when no completions in range", async () => {
+    const rows = [
+      { taskId: "t1", content: "Cardio", sectionName: "Workout", labels: [], description: null, isCompleted: false, deletedAt: null, completedDate: null },
+    ];
+    const db = createMockDb(rows);
+    const result = await queryHabitCompletions(db as never, "Habits", "2026-03-29", "2026-04-04");
+    expect(result).toHaveLength(1);
+    expect(result[0].completionDates).toEqual([]);
+  });
+
+  it("groups multiple tasks with their own completion dates", async () => {
+    const rows = [
+      { taskId: "t1", content: "Cardio", sectionName: "Workout", labels: [], description: null, isCompleted: false, deletedAt: null, completedDate: "2026-04-01" },
+      { taskId: "t2", content: "Strength", sectionName: "Workout", labels: [], description: null, isCompleted: false, deletedAt: null, completedDate: "2026-04-02" },
+      { taskId: "t2", content: "Strength", sectionName: "Workout", labels: [], description: null, isCompleted: false, deletedAt: null, completedDate: "2026-04-03" },
+    ];
+    const db = createMockDb(rows);
+    const result = await queryHabitCompletions(db as never, "Habits", "2026-03-29", "2026-04-04");
+    expect(result).toHaveLength(2);
+    const t1 = result.find((r) => r.taskId === "t1")!;
+    const t2 = result.find((r) => r.taskId === "t2")!;
+    expect(t1.completionDates).toEqual(["2026-04-01"]);
+    expect(t2.completionDates).toEqual(["2026-04-02", "2026-04-03"]);
   });
 });
 
