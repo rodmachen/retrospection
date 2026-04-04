@@ -1,0 +1,33 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getDb } from "@/db/client";
+import { queryHabitCompletions } from "@/api/queries";
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = request.nextUrl;
+
+  const project = searchParams.get("project") ?? "Habits";
+  const start = searchParams.get("start");
+  const end = searchParams.get("end");
+
+  if (!start || !end) {
+    return NextResponse.json(
+      { error: "start and end query params are required (YYYY-MM-DD)" },
+      { status: 400 }
+    );
+  }
+
+  const db = getDb();
+  const habits = await queryHabitCompletions(db, project, start, end);
+
+  return NextResponse.json(
+    habits.map((h) => ({
+      taskId: h.taskId,
+      content: h.content,
+      section: h.sectionName,
+      labels: h.labels,
+      description: h.description ?? "",
+      isActive: !h.isCompleted && h.deletedAt === null,
+      completionDates: h.completionDates,
+    }))
+  );
+}
