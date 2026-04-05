@@ -14,7 +14,6 @@ type TaskRow = typeof tasks.$inferSelect;
 export type NestedTask = TaskRow & { subtasks: NestedTask[] };
 
 export function nestSubtasks(flatTasks: TaskRow[]): NestedTask[] {
-  const flatIds = new Set(flatTasks.map((t) => t.id));
   const byId = new Map<string, NestedTask>();
 
   for (const task of flatTasks) {
@@ -25,7 +24,7 @@ export function nestSubtasks(flatTasks: TaskRow[]): NestedTask[] {
 
   for (const task of flatTasks) {
     const node = byId.get(task.id)!;
-    if (task.parentId !== null && flatIds.has(task.parentId)) {
+    if (task.parentId !== null && byId.has(task.parentId)) {
       // Attach to parent — works at any nesting depth
       byId.get(task.parentId)!.subtasks.push(node);
     } else {
@@ -85,6 +84,9 @@ export async function queryTasks(db: Db, filters: TaskFilters) {
     ];
     if (completed !== undefined) {
       subtaskConditions.push(eq(tasks.isCompleted, completed));
+    }
+    if (projectId) {
+      subtaskConditions.push(eq(tasks.projectId, projectId));
     }
 
     const childRows = await db
@@ -157,6 +159,7 @@ export async function queryHabitCompletions(
       sectionName: sections.name,
       labels: tasks.labels,
       description: tasks.description,
+      todoistCreatedAt: tasks.todoistCreatedAt,
       completedDate: taskCompletions.completedDate,
       skippedDate: taskSkippedDates.skippedDate,
     })
@@ -188,6 +191,7 @@ export async function queryHabitCompletions(
     sectionName: string | null;
     labels: string[];
     description: string | null;
+    createdDate: string | null;
     completionDates: Set<string>;
     skippedDates: Set<string>;
   };
@@ -196,12 +200,16 @@ export async function queryHabitCompletions(
 
   for (const row of rows) {
     if (!byTaskId.has(row.taskId)) {
+      const createdDate = row.todoistCreatedAt
+        ? row.todoistCreatedAt.toISOString().slice(0, 10)
+        : null;
       byTaskId.set(row.taskId, {
         taskId: row.taskId,
         content: row.content,
         sectionName: row.sectionName ?? null,
         labels: row.labels,
         description: row.description ?? null,
+        createdDate,
         completionDates: new Set(),
         skippedDates: new Set(),
       });
@@ -217,6 +225,7 @@ export async function queryHabitCompletions(
     sectionName: h.sectionName,
     labels: h.labels,
     description: h.description,
+    createdDate: h.createdDate,
     completionDates: Array.from(h.completionDates),
     skippedDates: Array.from(h.skippedDates),
   }));

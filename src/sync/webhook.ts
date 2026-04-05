@@ -1,9 +1,9 @@
 import crypto from "crypto";
 import { eq, and, desc } from "drizzle-orm";
-import { tasks, taskCompletions, projects, webhookEvents, syncLog } from "../db/schema";
+import { tasks, taskCompletions, projects, sections, webhookEvents, syncLog } from "../db/schema";
 import type { Db } from "../db/client";
-import { upsertTasks, upsertProjects, insertTaskCompletion, insertTaskSkippedDate, deleteTaskSkippedDatesFrom } from "./upsert";
-import type { TodoistTask, TodoistProject } from "../todoist/types";
+import { upsertTasks, upsertProjects, upsertSections, insertTaskCompletion, insertTaskSkippedDate, deleteTaskSkippedDatesFrom } from "./upsert";
+import type { TodoistTask, TodoistProject, TodoistSection } from "../todoist/types";
 import { getTodayInTimezone, getDatesBetween } from "../utils/dates";
 
 export function verifyHmac(
@@ -85,6 +85,15 @@ export async function processWebhookEvent(
 
     case "project:deleted":
       await handleProjectDeleted(db, event_data);
+      break;
+
+    case "section:added":
+    case "section:updated":
+      await handleSectionUpsert(db, event_data);
+      break;
+
+    case "section:deleted":
+      await handleSectionDeleted(db, event_data);
       break;
 
     default:
@@ -275,6 +284,27 @@ async function handleProjectDeleted(
     .update(projects)
     .set({ deletedAt: new Date(), updatedAt: new Date() })
     .where(eq(projects.id, projectId));
+}
+
+async function handleSectionUpsert(
+  db: Db,
+  eventData: Record<string, unknown>
+): Promise<void> {
+  const section: TodoistSection = {
+    id: String(eventData.id),
+    project_id: String(eventData.project_id ?? ""),
+    name: String(eventData.name ?? ""),
+    order: Number(eventData.section_order ?? 0),
+  };
+  await upsertSections(db, [section]);
+}
+
+async function handleSectionDeleted(
+  db: Db,
+  eventData: Record<string, unknown>
+): Promise<void> {
+  const sectionId = String(eventData.id);
+  await db.delete(sections).where(eq(sections.id, sectionId));
 }
 
 /**

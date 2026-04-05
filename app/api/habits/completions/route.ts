@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       section: h.sectionName,
       labels: h.labels,
       description: h.description ?? "",
+      createdDate: h.createdDate,
       isActive: true,
       completionDates: h.completionDates,
       skippedDates: h.skippedDates,
