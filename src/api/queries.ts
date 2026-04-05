@@ -14,7 +14,6 @@ type TaskRow = typeof tasks.$inferSelect;
 export type NestedTask = TaskRow & { subtasks: NestedTask[] };
 
 export function nestSubtasks(flatTasks: TaskRow[]): NestedTask[] {
-  const flatIds = new Set(flatTasks.map((t) => t.id));
   const byId = new Map<string, NestedTask>();
 
   for (const task of flatTasks) {
@@ -25,7 +24,7 @@ export function nestSubtasks(flatTasks: TaskRow[]): NestedTask[] {
 
   for (const task of flatTasks) {
     const node = byId.get(task.id)!;
-    if (task.parentId !== null && flatIds.has(task.parentId)) {
+    if (task.parentId !== null && byId.has(task.parentId)) {
       // Attach to parent — works at any nesting depth
       byId.get(task.parentId)!.subtasks.push(node);
     } else {
@@ -85,6 +84,9 @@ export async function queryTasks(db: Db, filters: TaskFilters) {
     ];
     if (completed !== undefined) {
       subtaskConditions.push(eq(tasks.isCompleted, completed));
+    }
+    if (projectId) {
+      subtaskConditions.push(eq(tasks.projectId, projectId));
     }
 
     const childRows = await db
