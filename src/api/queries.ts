@@ -167,7 +167,7 @@ export async function queryHabitCompletions(
         sql`${taskCompletions.completedDate} <= ${endDate}::date`
       )
     )
-    .where(and(isNull(tasks.parentId), isNull(tasks.deletedAt)))
+    .where(and(isNull(tasks.parentId), isNull(tasks.deletedAt), eq(tasks.isCompleted, false)))
     .orderBy(tasks.id, taskCompletions.completedDate);
 
   type HabitRow = {
