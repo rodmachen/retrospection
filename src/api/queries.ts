@@ -14,9 +14,9 @@ type TaskRow = typeof tasks.$inferSelect;
 export type NestedTask = TaskRow & { subtasks: NestedTask[] };
 
 export function nestSubtasks(flatTasks: TaskRow[]): NestedTask[] {
+  const flatIds = new Set(flatTasks.map((t) => t.id));
   const byId = new Map<string, NestedTask>();
 
-  // First pass: build map of all tasks with empty subtasks arrays
   for (const task of flatTasks) {
     byId.set(task.id, { ...task, subtasks: [] });
   }
@@ -25,7 +25,7 @@ export function nestSubtasks(flatTasks: TaskRow[]): NestedTask[] {
 
   for (const task of flatTasks) {
     const node = byId.get(task.id)!;
-    if (task.parentId !== null && byId.has(task.parentId)) {
+    if (task.parentId !== null && flatIds.has(task.parentId)) {
       // Attach to parent — works at any nesting depth
       byId.get(task.parentId)!.subtasks.push(node);
     } else {
@@ -78,14 +78,19 @@ export async function queryTasks(db: Db, filters: TaskFilters) {
 
   // Iteratively fetch the next level of descendants until none remain.
   // Capped at 5 levels to guard against circular parentId references in corrupted data.
-  // Note: the completed filter applies only to parent tasks. Child tasks are returned
-  // regardless of completion status so parents have full context (e.g., ?completed=false
-  // will return incomplete parents but their subtasks may include completed items).
   for (let depth = 0; depth < 5 && currentIds.length > 0; depth++) {
+    const subtaskConditions: ReturnType<typeof eq>[] = [
+      inArray(tasks.parentId, currentIds),
+      isNull(tasks.deletedAt),
+    ];
+    if (completed !== undefined) {
+      subtaskConditions.push(eq(tasks.isCompleted, completed));
+    }
+
     const childRows = await db
       .select()
       .from(tasks)
-      .where(and(inArray(tasks.parentId, currentIds), isNull(tasks.deletedAt)))
+      .where(and(...subtaskConditions))
       .orderBy(tasks.createdAt);
 
     if (childRows.length === 0) break;
