@@ -6,6 +6,7 @@ import crypto from "crypto";
 vi.mock("../../sync/upsert", () => ({
   upsertTasks: vi.fn(),
   upsertProjects: vi.fn(),
+  upsertSections: vi.fn(),
   insertTaskCompletion: vi.fn(),
   insertTaskSkippedDate: vi.fn(),
   deleteTaskSkippedDatesFrom: vi.fn(),
@@ -16,7 +17,7 @@ vi.mock("../../todoist/client", () => ({
   fetchActiveTasks: vi.fn(),
 }));
 
-import { upsertTasks, upsertProjects, insertTaskCompletion, insertTaskSkippedDate, deleteTaskSkippedDatesFrom } from "../../sync/upsert";
+import { upsertTasks, upsertProjects, upsertSections, insertTaskCompletion, insertTaskSkippedDate, deleteTaskSkippedDatesFrom } from "../../sync/upsert";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -489,6 +490,76 @@ describe("processWebhookEvent — project:deleted", () => {
     );
 
     expect(db.update).toHaveBeenCalled();
+  });
+});
+
+describe("processWebhookEvent — section:added", () => {
+  it("upserts the section", async () => {
+    const db = createMockDb();
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "section:added",
+        event_data: {
+          id: "s1",
+          project_id: "p1",
+          name: "Job Search",
+          section_order: 1,
+        },
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    expect(upsertSections).toHaveBeenCalledWith(
+      expect.anything(),
+      [expect.objectContaining({ id: "s1", project_id: "p1", name: "Job Search", order: 1 })]
+    );
+  });
+});
+
+describe("processWebhookEvent — section:updated", () => {
+  it("upserts the section with updated name", async () => {
+    const db = createMockDb();
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "section:updated",
+        event_data: {
+          id: "s1",
+          project_id: "p1",
+          name: "Job Hunt",
+          section_order: 1,
+        },
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    expect(upsertSections).toHaveBeenCalledWith(
+      expect.anything(),
+      [expect.objectContaining({ id: "s1", name: "Job Hunt" })]
+    );
+  });
+});
+
+describe("processWebhookEvent — section:deleted", () => {
+  it("hard-deletes the section", async () => {
+    const db = createMockDb();
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "section:deleted",
+        event_data: { id: "s1" },
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    expect(db.delete).toHaveBeenCalled();
   });
 });
 

@@ -157,6 +157,7 @@ export async function queryHabitCompletions(
       sectionName: sections.name,
       labels: tasks.labels,
       description: tasks.description,
+      todoistCreatedAt: tasks.todoistCreatedAt,
       completedDate: taskCompletions.completedDate,
       skippedDate: taskSkippedDates.skippedDate,
     })
@@ -188,6 +189,7 @@ export async function queryHabitCompletions(
     sectionName: string | null;
     labels: string[];
     description: string | null;
+    createdDate: string | null;
     completionDates: Set<string>;
     skippedDates: Set<string>;
   };
@@ -196,12 +198,16 @@ export async function queryHabitCompletions(
 
   for (const row of rows) {
     if (!byTaskId.has(row.taskId)) {
+      const createdDate = row.todoistCreatedAt
+        ? row.todoistCreatedAt.toLocaleDateString("en-CA", { timeZone: "UTC" })
+        : null;
       byTaskId.set(row.taskId, {
         taskId: row.taskId,
         content: row.content,
         sectionName: row.sectionName ?? null,
         labels: row.labels,
         description: row.description ?? null,
+        createdDate,
         completionDates: new Set(),
         skippedDates: new Set(),
       });
@@ -217,6 +223,7 @@ export async function queryHabitCompletions(
     sectionName: h.sectionName,
     labels: h.labels,
     description: h.description,
+    createdDate: h.createdDate,
     completionDates: Array.from(h.completionDates),
     skippedDates: Array.from(h.skippedDates),
   }));
