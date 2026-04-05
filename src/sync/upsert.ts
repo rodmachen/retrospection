@@ -1,5 +1,5 @@
-import { sql } from "drizzle-orm";
-import { projects, sections, tasks, taskCompletions } from "../db/schema";
+import { sql, and, eq, gte } from "drizzle-orm";
+import { projects, sections, tasks, taskCompletions, taskSkippedDates } from "../db/schema";
 import type { Db } from "../db/client";
 import type {
   TodoistProject,
@@ -127,6 +127,31 @@ export async function insertTaskCompletion(
       completedDate: completion.completedDate,
     })
     .onConflictDoNothing();
+}
+
+export async function insertTaskSkippedDate(
+  db: Db,
+  skip: { taskId: string; skippedDate: string }
+) {
+  await db
+    .insert(taskSkippedDates)
+    .values({ taskId: skip.taskId, skippedDate: skip.skippedDate })
+    .onConflictDoNothing();
+}
+
+export async function deleteTaskSkippedDatesFrom(
+  db: Db,
+  taskId: string,
+  fromDate: string
+) {
+  await db
+    .delete(taskSkippedDates)
+    .where(
+      and(
+        eq(taskSkippedDates.taskId, taskId),
+        gte(taskSkippedDates.skippedDate, fromDate)
+      )
+    );
 }
 
 /**
