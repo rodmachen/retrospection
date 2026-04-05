@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
       description: h.description ?? "",
       isActive: true,
       completionDates: h.completionDates,
+      skippedDates: h.skippedDates,
     }))
   );
 }

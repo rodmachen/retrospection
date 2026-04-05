@@ -1,5 +1,5 @@
 import { eq, and, desc, count, sql, isNull, inArray } from "drizzle-orm";
-import { tasks, projects, taskCompletions, sections, syncLog } from "../db/schema";
+import { tasks, projects, taskCompletions, taskSkippedDates, sections, syncLog } from "../db/schema";
 import type { Db } from "../db/client";
 
 export interface TaskFilters {
@@ -14,9 +14,9 @@ type TaskRow = typeof tasks.$inferSelect;
 export type NestedTask = TaskRow & { subtasks: NestedTask[] };
 
 export function nestSubtasks(flatTasks: TaskRow[]): NestedTask[] {
+  const flatIds = new Set(flatTasks.map((t) => t.id));
   const byId = new Map<string, NestedTask>();
 
-  // First pass: build map of all tasks with empty subtasks arrays
   for (const task of flatTasks) {
     byId.set(task.id, { ...task, subtasks: [] });
   }
@@ -25,7 +25,7 @@ export function nestSubtasks(flatTasks: TaskRow[]): NestedTask[] {
 
   for (const task of flatTasks) {
     const node = byId.get(task.id)!;
-    if (task.parentId !== null && byId.has(task.parentId)) {
+    if (task.parentId !== null && flatIds.has(task.parentId)) {
       // Attach to parent — works at any nesting depth
       byId.get(task.parentId)!.subtasks.push(node);
     } else {
@@ -78,14 +78,19 @@ export async function queryTasks(db: Db, filters: TaskFilters) {
 
   // Iteratively fetch the next level of descendants until none remain.
   // Capped at 5 levels to guard against circular parentId references in corrupted data.
-  // Note: the completed filter applies only to parent tasks. Child tasks are returned
-  // regardless of completion status so parents have full context (e.g., ?completed=false
-  // will return incomplete parents but their subtasks may include completed items).
   for (let depth = 0; depth < 5 && currentIds.length > 0; depth++) {
+    const subtaskConditions: ReturnType<typeof eq>[] = [
+      inArray(tasks.parentId, currentIds),
+      isNull(tasks.deletedAt),
+    ];
+    if (completed !== undefined) {
+      subtaskConditions.push(eq(tasks.isCompleted, completed));
+    }
+
     const childRows = await db
       .select()
       .from(tasks)
-      .where(and(inArray(tasks.parentId, currentIds), isNull(tasks.deletedAt)))
+      .where(and(...subtaskConditions))
       .orderBy(tasks.createdAt);
 
     if (childRows.length === 0) break;
@@ -153,6 +158,7 @@ export async function queryHabitCompletions(
       labels: tasks.labels,
       description: tasks.description,
       completedDate: taskCompletions.completedDate,
+      skippedDate: taskSkippedDates.skippedDate,
     })
     .from(tasks)
     .innerJoin(projects, and(eq(tasks.projectId, projects.id), eq(projects.name, projectName)))
@@ -165,19 +171,28 @@ export async function queryHabitCompletions(
         sql`${taskCompletions.completedDate} <= ${endDate}::date`
       )
     )
+    .leftJoin(
+      taskSkippedDates,
+      and(
+        eq(taskSkippedDates.taskId, tasks.id),
+        sql`${taskSkippedDates.skippedDate} >= ${startDate}::date`,
+        sql`${taskSkippedDates.skippedDate} <= ${endDate}::date`
+      )
+    )
     .where(and(isNull(tasks.parentId), isNull(tasks.deletedAt), eq(tasks.isCompleted, false)))
     .orderBy(tasks.id, taskCompletions.completedDate);
 
-  type HabitRow = {
+  type HabitAccumulator = {
     taskId: string;
     content: string;
     sectionName: string | null;
     labels: string[];
     description: string | null;
-    completionDates: string[];
+    completionDates: Set<string>;
+    skippedDates: Set<string>;
   };
 
-  const byTaskId = new Map<string, HabitRow>();
+  const byTaskId = new Map<string, HabitAccumulator>();
 
   for (const row of rows) {
     if (!byTaskId.has(row.taskId)) {
@@ -187,15 +202,24 @@ export async function queryHabitCompletions(
         sectionName: row.sectionName ?? null,
         labels: row.labels,
         description: row.description ?? null,
-        completionDates: [],
+        completionDates: new Set(),
+        skippedDates: new Set(),
       });
     }
-    if (row.completedDate !== null) {
-      byTaskId.get(row.taskId)!.completionDates.push(row.completedDate);
-    }
+    const habit = byTaskId.get(row.taskId)!;
+    if (row.completedDate !== null) habit.completionDates.add(row.completedDate);
+    if (row.skippedDate !== null) habit.skippedDates.add(row.skippedDate);
   }
 
-  return Array.from(byTaskId.values());
+  return Array.from(byTaskId.values()).map((h) => ({
+    taskId: h.taskId,
+    content: h.content,
+    sectionName: h.sectionName,
+    labels: h.labels,
+    description: h.description,
+    completionDates: Array.from(h.completionDates),
+    skippedDates: Array.from(h.skippedDates),
+  }));
 }
 
 export async function queryLatestSync(db: Db) {

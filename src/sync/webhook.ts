@@ -2,8 +2,9 @@ import crypto from "crypto";
 import { eq, and, desc } from "drizzle-orm";
 import { tasks, taskCompletions, projects, webhookEvents, syncLog } from "../db/schema";
 import type { Db } from "../db/client";
-import { upsertTasks, upsertProjects, insertTaskCompletion } from "./upsert";
+import { upsertTasks, upsertProjects, insertTaskCompletion, insertTaskSkippedDate, deleteTaskSkippedDatesFrom } from "./upsert";
 import type { TodoistTask, TodoistProject } from "../todoist/types";
+import { getTodayInTimezone, getDatesBetween } from "../utils/dates";
 
 export function verifyHmac(
   rawBody: string,
@@ -49,10 +50,6 @@ export async function recordDelivery(
   eventType: string
 ): Promise<void> {
   await db.insert(webhookEvents).values({ deliveryId, eventType });
-}
-
-function getTodayInTimezone(timezone: string): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: timezone });
 }
 
 export async function processWebhookEvent(
@@ -113,6 +110,35 @@ async function handleItemUpsert(
   todoistToken: string
 ): Promise<void> {
   const task = eventDataToTodoistTask(eventData);
+  const taskId = task.id;
+
+  // --- Skip detection for recurring tasks ---
+  const incomingDue = eventData.due as { date?: string; is_recurring?: boolean } | null;
+  const incomingDueDate = incomingDue?.date ?? null;
+  const incomingIsRecurring = incomingDue?.is_recurring ?? false;
+
+  if (incomingDueDate && incomingIsRecurring) {
+    const existingRows = await db
+      .select({ dueDate: tasks.dueDate, dueIsRecurring: tasks.dueIsRecurring })
+      .from(tasks)
+      .where(eq(tasks.id, taskId));
+
+    const existing = existingRows[0];
+    if (existing?.dueDate && existing.dueIsRecurring) {
+      const oldDueDate = existing.dueDate;
+
+      if (incomingDueDate > oldDueDate) {
+        // Forward move → insert skip records for each skipped date
+        const skippedDates = getDatesBetween(oldDueDate, incomingDueDate);
+        for (const skippedDate of skippedDates) {
+          await insertTaskSkippedDate(db, { taskId, skippedDate });
+        }
+      } else if (incomingDueDate < oldDueDate) {
+        // Backward move → delete invalidated skip records
+        await deleteTaskSkippedDatesFrom(db, taskId, incomingDueDate);
+      }
+    }
+  }
 
   // Self-healing: if the task references a project not in our DB,
   // we still upsert the task. FK is nullable or the project may exist.

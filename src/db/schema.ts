@@ -101,6 +101,21 @@ export const taskCompletions = pgTable(
   (table) => [unique("task_completions_task_date_unique").on(table.taskId, table.completedDate)]
 );
 
+export const taskSkippedDates = pgTable(
+  "task_skipped_dates",
+  {
+    id: serial("id").primaryKey(),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => tasks.id),
+    skippedDate: date("skipped_date").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [unique("task_skipped_dates_task_date_unique").on(table.taskId, table.skippedDate)]
+);
+
 export const webhookEvents = pgTable("webhook_events", {
   deliveryId: varchar("delivery_id", { length: 100 }).primaryKey(),
   eventType: varchar("event_type", { length: 50 }).notNull(),
@@ -144,11 +159,19 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
     references: [sections.id],
   }),
   completions: many(taskCompletions),
+  skippedDates: many(taskSkippedDates),
 }));
 
 export const taskCompletionsRelations = relations(taskCompletions, ({ one }) => ({
   task: one(tasks, {
     fields: [taskCompletions.taskId],
+    references: [tasks.id],
+  }),
+}));
+
+export const taskSkippedDatesRelations = relations(taskSkippedDates, ({ one }) => ({
+  task: one(tasks, {
+    fields: [taskSkippedDates.taskId],
     references: [tasks.id],
   }),
 }));

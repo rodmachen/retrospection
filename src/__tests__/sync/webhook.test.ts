@@ -7,6 +7,8 @@ vi.mock("../../sync/upsert", () => ({
   upsertTasks: vi.fn(),
   upsertProjects: vi.fn(),
   insertTaskCompletion: vi.fn(),
+  insertTaskSkippedDate: vi.fn(),
+  deleteTaskSkippedDatesFrom: vi.fn(),
   mapTodoistTask: vi.fn(),
 }));
 
@@ -14,7 +16,7 @@ vi.mock("../../todoist/client", () => ({
   fetchActiveTasks: vi.fn(),
 }));
 
-import { upsertTasks, upsertProjects, insertTaskCompletion } from "../../sync/upsert";
+import { upsertTasks, upsertProjects, insertTaskCompletion, insertTaskSkippedDate, deleteTaskSkippedDatesFrom } from "../../sync/upsert";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -150,6 +152,39 @@ describe("processWebhookEvent — item:added", () => {
       expect.anything(),
       [expect.objectContaining({ id: "t1", content: "New task" })]
     );
+  });
+
+  it("skip detection is a no-op for item:added (task not yet in DB)", async () => {
+    // item:added fires before the task exists in our DB, so skip detection
+    // must safely do nothing even if the event includes a recurring due date.
+    const db = mockDbTaskNotFound();
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:added",
+        event_data: {
+          id: "t1",
+          content: "New recurring habit",
+          description: "",
+          project_id: "p1",
+          section_id: null,
+          parent_id: null,
+          priority: 1,
+          labels: [],
+          due: { date: "2024-06-18", is_recurring: true, string: "every day" },
+          checked: false,
+          completed_at: null,
+          added_at: "2024-01-01T00:00:00Z",
+        },
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    expect(insertTaskSkippedDate).not.toHaveBeenCalled();
+    expect(deleteTaskSkippedDatesFrom).not.toHaveBeenCalled();
+    expect(upsertTasks).toHaveBeenCalled();
   });
 });
 
@@ -454,5 +489,234 @@ describe("processWebhookEvent — project:deleted", () => {
     );
 
     expect(db.update).toHaveBeenCalled();
+  });
+});
+
+// Helper for item:updated skip-detection tests
+function makeRecurringEventData(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "t1",
+    content: "Daily habit",
+    description: "",
+    project_id: "p1",
+    section_id: null,
+    parent_id: null,
+    priority: 1,
+    labels: [],
+    due: { date: "2024-06-18", is_recurring: true, string: "every day" },
+    checked: false,
+    completed_at: null,
+    added_at: "2024-01-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+function mockDbWithExistingTask(dueDate: string | null, dueIsRecurring: boolean) {
+  const db = createMockDb();
+  db.select = vi.fn(() => ({
+    from: vi.fn(() => ({
+      where: vi.fn(() => [{ dueDate, dueIsRecurring }]),
+    })),
+  }));
+  return db;
+}
+
+function mockDbTaskNotFound() {
+  const db = createMockDb();
+  db.select = vi.fn(() => ({
+    from: vi.fn(() => ({
+      where: vi.fn(() => []),
+    })),
+  }));
+  return db;
+}
+
+describe("processWebhookEvent — item:updated skip detection", () => {
+  it("creates skip records when recurring task due date moves forward", async () => {
+    // Old due: June 15, incoming due: June 18 → skip 15, 16, 17
+    const db = mockDbWithExistingTask("2024-06-15", true);
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:updated",
+        event_data: makeRecurringEventData({
+          due: { date: "2024-06-18", is_recurring: true, string: "every day" },
+        }),
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    expect(insertTaskSkippedDate).toHaveBeenCalledTimes(3);
+    expect(insertTaskSkippedDate).toHaveBeenCalledWith(expect.anything(), { taskId: "t1", skippedDate: "2024-06-15" });
+    expect(insertTaskSkippedDate).toHaveBeenCalledWith(expect.anything(), { taskId: "t1", skippedDate: "2024-06-16" });
+    expect(insertTaskSkippedDate).toHaveBeenCalledWith(expect.anything(), { taskId: "t1", skippedDate: "2024-06-17" });
+  });
+
+  it("does not create skips for non-recurring tasks", async () => {
+    // Old is recurring but incoming is not
+    const db = mockDbWithExistingTask("2024-06-15", true);
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:updated",
+        event_data: makeRecurringEventData({
+          due: { date: "2024-06-18", is_recurring: false, string: "" },
+        }),
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    expect(insertTaskSkippedDate).not.toHaveBeenCalled();
+  });
+
+  it("does not create skips when task not in DB", async () => {
+    const db = mockDbTaskNotFound();
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:updated",
+        event_data: makeRecurringEventData(),
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    expect(insertTaskSkippedDate).not.toHaveBeenCalled();
+  });
+
+  it("does not create skips when old dueDate is null", async () => {
+    // Task exists in DB but has no due date set
+    const db = mockDbWithExistingTask(null, true);
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:updated",
+        event_data: makeRecurringEventData(),
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    expect(insertTaskSkippedDate).not.toHaveBeenCalled();
+  });
+
+  it("does not create skips when dates are equal", async () => {
+    const db = mockDbWithExistingTask("2024-06-18", true);
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:updated",
+        event_data: makeRecurringEventData({
+          due: { date: "2024-06-18", is_recurring: true, string: "every day" },
+        }),
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    expect(insertTaskSkippedDate).not.toHaveBeenCalled();
+    expect(deleteTaskSkippedDatesFrom).not.toHaveBeenCalled();
+  });
+
+  it("creates single skip when dates are one day apart", async () => {
+    // Old: June 17, incoming: June 18 → skip only June 17
+    const db = mockDbWithExistingTask("2024-06-17", true);
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:updated",
+        event_data: makeRecurringEventData({
+          due: { date: "2024-06-18", is_recurring: true, string: "every day" },
+        }),
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    expect(insertTaskSkippedDate).toHaveBeenCalledTimes(1);
+    expect(insertTaskSkippedDate).toHaveBeenCalledWith(expect.anything(), { taskId: "t1", skippedDate: "2024-06-17" });
+  });
+
+  it("backward move deletes skips on/after new date", async () => {
+    // Old: June 18, incoming: June 15 → delete skips >= June 15
+    const db = mockDbWithExistingTask("2024-06-18", true);
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:updated",
+        event_data: makeRecurringEventData({
+          due: { date: "2024-06-15", is_recurring: true, string: "every day" },
+        }),
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    expect(deleteTaskSkippedDatesFrom).toHaveBeenCalledWith(expect.anything(), "t1", "2024-06-15");
+    expect(insertTaskSkippedDate).not.toHaveBeenCalled();
+  });
+
+  it("backward move does not delete skips before new date", async () => {
+    // The deleteTaskSkippedDatesFrom function uses >= fromDate, so records
+    // before fromDate are preserved. We verify it's called with the right date.
+    const db = mockDbWithExistingTask("2024-06-20", true);
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:updated",
+        event_data: makeRecurringEventData({
+          due: { date: "2024-06-17", is_recurring: true, string: "every day" },
+        }),
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    // Called with "2024-06-17" — only deletes >= that date, preserving earlier records
+    expect(deleteTaskSkippedDatesFrom).toHaveBeenCalledWith(expect.anything(), "t1", "2024-06-17");
+  });
+
+  it("upsert still called after both forward and backward moves", async () => {
+    // Forward move
+    const dbFwd = mockDbWithExistingTask("2024-06-15", true);
+    await processWebhookEvent(
+      dbFwd as never,
+      {
+        event_name: "item:updated",
+        event_data: makeRecurringEventData({
+          due: { date: "2024-06-18", is_recurring: true, string: "every day" },
+        }),
+      },
+      "America/Chicago",
+      "test-token"
+    );
+    expect(upsertTasks).toHaveBeenCalled();
+
+    vi.clearAllMocks();
+
+    // Backward move
+    const dbBwd = mockDbWithExistingTask("2024-06-18", true);
+    await processWebhookEvent(
+      dbBwd as never,
+      {
+        event_name: "item:updated",
+        event_data: makeRecurringEventData({
+          due: { date: "2024-06-15", is_recurring: true, string: "every day" },
+        }),
+      },
+      "America/Chicago",
+      "test-token"
+    );
+    expect(upsertTasks).toHaveBeenCalled();
   });
 });

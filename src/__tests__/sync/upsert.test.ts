@@ -5,6 +5,8 @@ import {
   upsertTasks,
   insertTaskCompletion,
   inferRecurringCompletions,
+  insertTaskSkippedDate,
+  deleteTaskSkippedDatesFrom,
 } from "../../sync/upsert";
 import type { TodoistProject, TodoistSection, TodoistTask } from "../../todoist/types";
 
@@ -35,8 +37,22 @@ function createMockDb() {
     return chain;
   };
 
+  const deletedWhere: Record<string, unknown[]> = {};
+
+  const deleteChainable = (tableName: string) => {
+    const chain = {
+      where: (condition: unknown) => {
+        if (!deletedWhere[tableName]) deletedWhere[tableName] = [];
+        deletedWhere[tableName].push(condition);
+        return chain;
+      },
+    };
+    return chain;
+  };
+
   const db = {
     insert: vi.fn((table: Record<symbol, string>) => chainable(table[TABLE_NAME_SYM])),
+    delete: vi.fn((table: Record<symbol, string>) => deleteChainable(table[TABLE_NAME_SYM])),
     select: vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(() => []),
@@ -44,6 +60,7 @@ function createMockDb() {
     })),
     _insertedValues: insertedValues,
     _conflictAction: conflictAction,
+    _deletedWhere: deletedWhere,
   };
 
   return db;
@@ -241,5 +258,40 @@ describe("inferRecurringCompletions", () => {
     const count = await inferRecurringCompletions(db as never, [recurringTask], "America/Chicago");
     expect(db.insert).not.toHaveBeenCalled();
     expect(count).toBe(0);
+  });
+});
+
+describe("insertTaskSkippedDate", () => {
+  it("inserts with onConflictDoNothing for idempotency", async () => {
+    const db = createMockDb();
+    await insertTaskSkippedDate(db as never, { taskId: "t1", skippedDate: "2024-06-15" });
+
+    expect(db.insert).toHaveBeenCalledTimes(1);
+    expect(db._insertedValues["task_skipped_dates"]).toHaveLength(1);
+    expect(db._insertedValues["task_skipped_dates"][0]).toMatchObject({
+      taskId: "t1",
+      skippedDate: "2024-06-15",
+    });
+    expect(db._conflictAction["task_skipped_dates"]).toBe("doNothing");
+  });
+});
+
+describe("deleteTaskSkippedDatesFrom", () => {
+  it("calls delete on task_skipped_dates with a where condition", async () => {
+    const db = createMockDb();
+    await deleteTaskSkippedDatesFrom(db as never, "t1", "2024-06-15");
+
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(db._deletedWhere["task_skipped_dates"]).toHaveLength(1);
+  });
+
+  it("deletes using the correct table", async () => {
+    const db = createMockDb();
+    await deleteTaskSkippedDatesFrom(db as never, "t2", "2024-07-01");
+
+    // delete was called once (on task_skipped_dates table)
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    const [tableArg] = (db.delete as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(tableArg[Symbol.for("drizzle:Name")]).toBe("task_skipped_dates");
   });
 });

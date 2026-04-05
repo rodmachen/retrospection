@@ -1,11 +1,12 @@
-import { sql } from "drizzle-orm";
-import { projects, sections, tasks, taskCompletions } from "../db/schema";
+import { sql, and, eq, gte } from "drizzle-orm";
+import { projects, sections, tasks, taskCompletions, taskSkippedDates } from "../db/schema";
 import type { Db } from "../db/client";
 import type {
   TodoistProject,
   TodoistSection,
   TodoistTask,
 } from "../todoist/types";
+import { getTodayInTimezone } from "../utils/dates";
 
 export async function upsertProjects(db: Db, items: TodoistProject[]) {
   if (items.length === 0) return;
@@ -128,6 +129,31 @@ export async function insertTaskCompletion(
     .onConflictDoNothing();
 }
 
+export async function insertTaskSkippedDate(
+  db: Db,
+  skip: { taskId: string; skippedDate: string }
+) {
+  await db
+    .insert(taskSkippedDates)
+    .values({ taskId: skip.taskId, skippedDate: skip.skippedDate })
+    .onConflictDoNothing();
+}
+
+export async function deleteTaskSkippedDatesFrom(
+  db: Db,
+  taskId: string,
+  fromDate: string
+) {
+  await db
+    .delete(taskSkippedDates)
+    .where(
+      and(
+        eq(taskSkippedDates.taskId, taskId),
+        gte(taskSkippedDates.skippedDate, fromDate)
+      )
+    );
+}
+
 /**
  * Infer today's completions for active recurring tasks.
  *
@@ -161,6 +187,3 @@ export async function inferRecurringCompletions(
   return count;
 }
 
-function getTodayInTimezone(timezone: string): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: timezone });
-}
