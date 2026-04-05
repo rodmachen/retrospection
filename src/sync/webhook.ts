@@ -4,6 +4,7 @@ import { tasks, taskCompletions, projects, webhookEvents, syncLog } from "../db/
 import type { Db } from "../db/client";
 import { upsertTasks, upsertProjects, insertTaskCompletion } from "./upsert";
 import type { TodoistTask, TodoistProject } from "../todoist/types";
+import { getTodayInTimezone } from "../utils/dates";
 
 export function verifyHmac(
   rawBody: string,
@@ -49,10 +50,6 @@ export async function recordDelivery(
   eventType: string
 ): Promise<void> {
   await db.insert(webhookEvents).values({ deliveryId, eventType });
-}
-
-function getTodayInTimezone(timezone: string): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: timezone });
 }
 
 export async function processWebhookEvent(

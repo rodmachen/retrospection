@@ -6,6 +6,7 @@ import type {
   TodoistSection,
   TodoistTask,
 } from "../todoist/types";
+import { getTodayInTimezone } from "../utils/dates";
 
 export async function upsertProjects(db: Db, items: TodoistProject[]) {
   if (items.length === 0) return;
@@ -161,6 +162,3 @@ export async function inferRecurringCompletions(
   return count;
 }
 
-function getTodayInTimezone(timezone: string): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: timezone });
-}
