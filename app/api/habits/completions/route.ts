@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       section: h.sectionName,
       labels: h.labels,
       description: h.description ?? "",
-      isActive: !h.isCompleted,
+      isActive: true,
       completionDates: h.completionDates,
     }))
   );

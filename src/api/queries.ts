@@ -152,8 +152,6 @@ export async function queryHabitCompletions(
       sectionName: sections.name,
       labels: tasks.labels,
       description: tasks.description,
-      isCompleted: tasks.isCompleted,
-      deletedAt: tasks.deletedAt,
       completedDate: taskCompletions.completedDate,
     })
     .from(tasks)
@@ -167,7 +165,7 @@ export async function queryHabitCompletions(
         sql`${taskCompletions.completedDate} <= ${endDate}::date`
       )
     )
-    .where(and(isNull(tasks.parentId), isNull(tasks.deletedAt)))
+    .where(and(isNull(tasks.parentId), isNull(tasks.deletedAt), eq(tasks.isCompleted, false)))
     .orderBy(tasks.id, taskCompletions.completedDate);
 
   type HabitRow = {
@@ -176,8 +174,6 @@ export async function queryHabitCompletions(
     sectionName: string | null;
     labels: string[];
     description: string | null;
-    isCompleted: boolean;
-    deletedAt: Date | null;
     completionDates: string[];
   };
 
@@ -191,8 +187,6 @@ export async function queryHabitCompletions(
         sectionName: row.sectionName ?? null,
         labels: row.labels,
         description: row.description ?? null,
-        isCompleted: row.isCompleted,
-        deletedAt: row.deletedAt ?? null,
         completionDates: [],
       });
     }
