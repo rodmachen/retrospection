@@ -1,5 +1,5 @@
 import { eq, and, desc, count, sql, isNull, inArray } from "drizzle-orm";
-import { tasks, projects, taskCompletions, sections, syncLog } from "../db/schema";
+import { tasks, projects, taskCompletions, taskSkippedDates, sections, syncLog } from "../db/schema";
 import type { Db } from "../db/client";
 
 export interface TaskFilters {
@@ -153,6 +153,7 @@ export async function queryHabitCompletions(
       labels: tasks.labels,
       description: tasks.description,
       completedDate: taskCompletions.completedDate,
+      skippedDate: taskSkippedDates.skippedDate,
     })
     .from(tasks)
     .innerJoin(projects, and(eq(tasks.projectId, projects.id), eq(projects.name, projectName)))
@@ -165,6 +166,14 @@ export async function queryHabitCompletions(
         sql`${taskCompletions.completedDate} <= ${endDate}::date`
       )
     )
+    .leftJoin(
+      taskSkippedDates,
+      and(
+        eq(taskSkippedDates.taskId, tasks.id),
+        sql`${taskSkippedDates.skippedDate} >= ${startDate}::date`,
+        sql`${taskSkippedDates.skippedDate} <= ${endDate}::date`
+      )
+    )
     .where(and(isNull(tasks.parentId), isNull(tasks.deletedAt), eq(tasks.isCompleted, false)))
     .orderBy(tasks.id, taskCompletions.completedDate);
 
@@ -175,6 +184,7 @@ export async function queryHabitCompletions(
     labels: string[];
     description: string | null;
     completionDates: string[];
+    skippedDates: string[];
   };
 
   const byTaskId = new Map<string, HabitRow>();
@@ -188,10 +198,15 @@ export async function queryHabitCompletions(
         labels: row.labels,
         description: row.description ?? null,
         completionDates: [],
+        skippedDates: [],
       });
     }
-    if (row.completedDate !== null) {
-      byTaskId.get(row.taskId)!.completionDates.push(row.completedDate);
+    const habit = byTaskId.get(row.taskId)!;
+    if (row.completedDate !== null && !habit.completionDates.includes(row.completedDate)) {
+      habit.completionDates.push(row.completedDate);
+    }
+    if (row.skippedDate !== null && !habit.skippedDates.includes(row.skippedDate)) {
+      habit.skippedDates.push(row.skippedDate);
     }
   }
 
