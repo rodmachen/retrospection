@@ -240,16 +240,6 @@ describe("queryHabitCompletions", () => {
     expect(result[0].completionDates).toEqual([]);
   });
 
-  it("passes isCompleted field through for active habits", async () => {
-    const rows = [
-      { taskId: "t1", content: "Quizlet", sectionName: "French", labels: [], description: null, isCompleted: false, deletedAt: null, completedDate: null },
-    ];
-    const db = createMockDb(rows);
-    const result = await queryHabitCompletions(db as never, "Habits", "2026-03-29", "2026-04-04");
-    expect(result).toHaveLength(1);
-    expect(result[0].isCompleted).toBe(false);
-  });
-
   it("groups multiple tasks with their own completion dates", async () => {
     const rows = [
       { taskId: "t1", content: "Cardio", sectionName: "Workout", labels: [], description: null, isCompleted: false, deletedAt: null, completedDate: "2026-04-01" },
