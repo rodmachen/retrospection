@@ -199,7 +199,7 @@ export async function queryHabitCompletions(
   for (const row of rows) {
     if (!byTaskId.has(row.taskId)) {
       const createdDate = row.todoistCreatedAt
-        ? row.todoistCreatedAt.toLocaleDateString("en-CA", { timeZone: "UTC" })
+        ? row.todoistCreatedAt.toISOString().slice(0, 10)
         : null;
       byTaskId.set(row.taskId, {
         taskId: row.taskId,

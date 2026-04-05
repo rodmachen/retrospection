@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { verifyHmac, isDuplicateDelivery, recordDelivery, processWebhookEvent } from "../../sync/webhook";
+import { sections } from "../../db/schema";
 import crypto from "crypto";
 
 // Mock the upsert module
@@ -559,7 +560,7 @@ describe("processWebhookEvent — section:deleted", () => {
       "test-token"
     );
 
-    expect(db.delete).toHaveBeenCalled();
+    expect(db.delete).toHaveBeenCalledWith(sections);
   });
 });
 
