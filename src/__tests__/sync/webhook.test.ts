@@ -153,6 +153,39 @@ describe("processWebhookEvent — item:added", () => {
       [expect.objectContaining({ id: "t1", content: "New task" })]
     );
   });
+
+  it("skip detection is a no-op for item:added (task not yet in DB)", async () => {
+    // item:added fires before the task exists in our DB, so skip detection
+    // must safely do nothing even if the event includes a recurring due date.
+    const db = mockDbTaskNotFound();
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:added",
+        event_data: {
+          id: "t1",
+          content: "New recurring habit",
+          description: "",
+          project_id: "p1",
+          section_id: null,
+          parent_id: null,
+          priority: 1,
+          labels: [],
+          due: { date: "2024-06-18", is_recurring: true, string: "every day" },
+          checked: false,
+          completed_at: null,
+          added_at: "2024-01-01T00:00:00Z",
+        },
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    expect(insertTaskSkippedDate).not.toHaveBeenCalled();
+    expect(deleteTaskSkippedDatesFrom).not.toHaveBeenCalled();
+    expect(upsertTasks).toHaveBeenCalled();
+  });
 });
 
 describe("processWebhookEvent — item:completed (one-off)", () => {
@@ -482,11 +515,17 @@ function mockDbWithExistingTask(dueDate: string | null, dueIsRecurring: boolean)
   const db = createMockDb();
   db.select = vi.fn(() => ({
     from: vi.fn(() => ({
-      where: vi.fn(() =>
-        dueDate !== null
-          ? [{ dueDate, dueIsRecurring }]
-          : []
-      ),
+      where: vi.fn(() => [{ dueDate, dueIsRecurring }]),
+    })),
+  }));
+  return db;
+}
+
+function mockDbTaskNotFound() {
+  const db = createMockDb();
+  db.select = vi.fn(() => ({
+    from: vi.fn(() => ({
+      where: vi.fn(() => []),
     })),
   }));
   return db;
@@ -535,7 +574,7 @@ describe("processWebhookEvent — item:updated skip detection", () => {
   });
 
   it("does not create skips when task not in DB", async () => {
-    const db = createMockDb(); // default select returns []
+    const db = mockDbTaskNotFound();
 
     await processWebhookEvent(
       db as never,
@@ -551,6 +590,7 @@ describe("processWebhookEvent — item:updated skip detection", () => {
   });
 
   it("does not create skips when old dueDate is null", async () => {
+    // Task exists in DB but has no due date set
     const db = mockDbWithExistingTask(null, true);
 
     await processWebhookEvent(

@@ -177,17 +177,17 @@ export async function queryHabitCompletions(
     .where(and(isNull(tasks.parentId), isNull(tasks.deletedAt), eq(tasks.isCompleted, false)))
     .orderBy(tasks.id, taskCompletions.completedDate);
 
-  type HabitRow = {
+  type HabitAccumulator = {
     taskId: string;
     content: string;
     sectionName: string | null;
     labels: string[];
     description: string | null;
-    completionDates: string[];
-    skippedDates: string[];
+    completionDates: Set<string>;
+    skippedDates: Set<string>;
   };
 
-  const byTaskId = new Map<string, HabitRow>();
+  const byTaskId = new Map<string, HabitAccumulator>();
 
   for (const row of rows) {
     if (!byTaskId.has(row.taskId)) {
@@ -197,20 +197,24 @@ export async function queryHabitCompletions(
         sectionName: row.sectionName ?? null,
         labels: row.labels,
         description: row.description ?? null,
-        completionDates: [],
-        skippedDates: [],
+        completionDates: new Set(),
+        skippedDates: new Set(),
       });
     }
     const habit = byTaskId.get(row.taskId)!;
-    if (row.completedDate !== null && !habit.completionDates.includes(row.completedDate)) {
-      habit.completionDates.push(row.completedDate);
-    }
-    if (row.skippedDate !== null && !habit.skippedDates.includes(row.skippedDate)) {
-      habit.skippedDates.push(row.skippedDate);
-    }
+    if (row.completedDate !== null) habit.completionDates.add(row.completedDate);
+    if (row.skippedDate !== null) habit.skippedDates.add(row.skippedDate);
   }
 
-  return Array.from(byTaskId.values());
+  return Array.from(byTaskId.values()).map((h) => ({
+    taskId: h.taskId,
+    content: h.content,
+    sectionName: h.sectionName,
+    labels: h.labels,
+    description: h.description,
+    completionDates: Array.from(h.completionDates),
+    skippedDates: Array.from(h.skippedDates),
+  }));
 }
 
 export async function queryLatestSync(db: Db) {
