@@ -4,6 +4,7 @@ import {
   sections,
   tasks,
   taskCompletions,
+  taskSkippedDates,
   webhookEvents,
   syncLog,
 } from "../../db/schema";
@@ -32,6 +33,18 @@ describe("database schema", () => {
 
   it("sync_log table has correct name", () => {
     expect(getTableName(syncLog)).toBe("sync_log");
+  });
+
+  it("task_skipped_dates table has correct name", () => {
+    expect(getTableName(taskSkippedDates)).toBe("task_skipped_dates");
+  });
+
+  it("task_skipped_dates has required columns", () => {
+    const cols = Object.keys(taskSkippedDates);
+    expect(cols).toContain("id");
+    expect(cols).toContain("taskId");
+    expect(cols).toContain("skippedDate");
+    expect(cols).toContain("createdAt");
   });
 
   it("tasks table has all required columns", () => {
