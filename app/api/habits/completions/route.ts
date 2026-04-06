@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
       taskId: h.taskId,
       content: h.content,
       section: h.sectionName,
+      sectionOrder: h.sectionOrder,
       labels: h.labels,
       description: h.description ?? "",
       createdDate: h.createdDate,

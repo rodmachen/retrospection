@@ -220,20 +220,21 @@ describe("queryHabitCompletions", () => {
 
   it("returns task with completion dates grouped", async () => {
     const rows = [
-      { taskId: "t1", content: "Cardio", sectionName: "Workout", labels: ["Workout"], description: null, todoistCreatedAt: null, completedDate: "2026-03-29", skippedDate: null },
-      { taskId: "t1", content: "Cardio", sectionName: "Workout", labels: ["Workout"], description: null, todoistCreatedAt: null, completedDate: "2026-04-01", skippedDate: null },
+      { taskId: "t1", content: "Cardio", sectionName: "Workout", sectionOrder: 4, labels: ["Workout"], description: null, todoistCreatedAt: null, completedDate: "2026-03-29", skippedDate: null },
+      { taskId: "t1", content: "Cardio", sectionName: "Workout", sectionOrder: 4, labels: ["Workout"], description: null, todoistCreatedAt: null, completedDate: "2026-04-01", skippedDate: null },
     ];
     const db = createMockDb(rows);
     const result = await queryHabitCompletions(db as never, "Habits", "2026-03-29", "2026-04-04");
     expect(result).toHaveLength(1);
     expect(result[0].taskId).toBe("t1");
+    expect(result[0].sectionOrder).toBe(4);
     expect(result[0].completionDates).toEqual(["2026-03-29", "2026-04-01"]);
     expect(result[0].skippedDates).toEqual([]);
   });
 
   it("returns task with empty completionDates when no completions in range", async () => {
     const rows = [
-      { taskId: "t1", content: "Cardio", sectionName: "Workout", labels: [], description: null, todoistCreatedAt: null, completedDate: null, skippedDate: null },
+      { taskId: "t1", content: "Lexique", sectionName: "French", sectionOrder: 5, labels: [], description: null, todoistCreatedAt: null, completedDate: null, skippedDate: null },
     ];
     const db = createMockDb(rows);
     const result = await queryHabitCompletions(db as never, "Habits", "2026-03-29", "2026-04-04");
@@ -244,9 +245,9 @@ describe("queryHabitCompletions", () => {
 
   it("groups multiple tasks with their own completion dates", async () => {
     const rows = [
-      { taskId: "t1", content: "Cardio", sectionName: "Workout", labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-01", skippedDate: null },
-      { taskId: "t2", content: "Strength", sectionName: "Workout", labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-02", skippedDate: null },
-      { taskId: "t2", content: "Strength", sectionName: "Workout", labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-03", skippedDate: null },
+      { taskId: "t1", content: "Cardio", sectionName: "Workout", sectionOrder: 4, labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-01", skippedDate: null },
+      { taskId: "t2", content: "Strength", sectionName: "Workout", sectionOrder: 4, labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-02", skippedDate: null },
+      { taskId: "t2", content: "Strength", sectionName: "Workout", sectionOrder: 4, labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-03", skippedDate: null },
     ];
     const db = createMockDb(rows);
     const result = await queryHabitCompletions(db as never, "Habits", "2026-03-29", "2026-04-04");
@@ -261,8 +262,8 @@ describe("queryHabitCompletions", () => {
 
   it("returns task with skipped dates populated", async () => {
     const rows = [
-      { taskId: "t1", content: "Cardio", sectionName: "Workout", labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-01", skippedDate: "2026-03-30" },
-      { taskId: "t1", content: "Cardio", sectionName: "Workout", labels: [], description: null, todoistCreatedAt: null, completedDate: null, skippedDate: "2026-03-31" },
+      { taskId: "t1", content: "Taking Charge", sectionName: "Reading", sectionOrder: 6, labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-01", skippedDate: "2026-03-30" },
+      { taskId: "t1", content: "Taking Charge", sectionName: "Reading", sectionOrder: 6, labels: [], description: null, todoistCreatedAt: null, completedDate: null, skippedDate: "2026-03-31" },
     ];
     const db = createMockDb(rows);
     const result = await queryHabitCompletions(db as never, "Habits", "2026-03-29", "2026-04-04");
@@ -274,10 +275,10 @@ describe("queryHabitCompletions", () => {
   it("deduplicates via Set when cross-product produces repeated dates", async () => {
     // Two completions × two skips = 4 rows, but unique dates should be preserved
     const rows = [
-      { taskId: "t1", content: "Cardio", sectionName: null, labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-01", skippedDate: "2026-03-30" },
-      { taskId: "t1", content: "Cardio", sectionName: null, labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-02", skippedDate: "2026-03-30" },
-      { taskId: "t1", content: "Cardio", sectionName: null, labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-01", skippedDate: "2026-03-31" },
-      { taskId: "t1", content: "Cardio", sectionName: null, labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-02", skippedDate: "2026-03-31" },
+      { taskId: "t1", content: "Cardio", sectionName: null, sectionOrder: null, labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-01", skippedDate: "2026-03-30" },
+      { taskId: "t1", content: "Cardio", sectionName: null, sectionOrder: null, labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-02", skippedDate: "2026-03-30" },
+      { taskId: "t1", content: "Cardio", sectionName: null, sectionOrder: null, labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-01", skippedDate: "2026-03-31" },
+      { taskId: "t1", content: "Cardio", sectionName: null, sectionOrder: null, labels: [], description: null, todoistCreatedAt: null, completedDate: "2026-04-02", skippedDate: "2026-03-31" },
     ];
     const db = createMockDb(rows);
     const result = await queryHabitCompletions(db as never, "Habits", "2026-03-29", "2026-04-04");
@@ -290,7 +291,7 @@ describe("queryHabitCompletions", () => {
   it("returns createdDate as YYYY-MM-DD when todoistCreatedAt is set", async () => {
     const rows = [
       {
-        taskId: "t1", content: "Cardio", sectionName: null, labels: [], description: null,
+        taskId: "t1", content: "Cardio", sectionName: null, sectionOrder: null, labels: [], description: null,
         todoistCreatedAt: new Date("2026-04-05T10:30:00Z"),
         completedDate: null, skippedDate: null,
       },
@@ -300,10 +301,33 @@ describe("queryHabitCompletions", () => {
     expect(result[0].createdDate).toBe("2026-04-05");
   });
 
+  it("returns sectionOrder from sections table", async () => {
+    const rows = [
+      { taskId: "t1", content: "React Course", sectionName: "Coding Studies", sectionOrder: 2, labels: [], description: null, todoistCreatedAt: null, completedDate: null, skippedDate: null },
+      { taskId: "t2", content: "Cardio", sectionName: "Workout", sectionOrder: 4, labels: [], description: null, todoistCreatedAt: null, completedDate: null, skippedDate: null },
+    ];
+    const db = createMockDb(rows);
+    const result = await queryHabitCompletions(db as never, "Habits", "2026-03-29", "2026-04-04");
+    expect(result).toHaveLength(2);
+    const t1 = result.find((r) => r.taskId === "t1")!;
+    const t2 = result.find((r) => r.taskId === "t2")!;
+    expect(t1.sectionOrder).toBe(2);
+    expect(t2.sectionOrder).toBe(4);
+  });
+
+  it("returns sectionOrder as null for unsectioned tasks", async () => {
+    const rows = [
+      { taskId: "t1", content: "Cardio", sectionName: null, sectionOrder: null, labels: [], description: null, todoistCreatedAt: null, completedDate: null, skippedDate: null },
+    ];
+    const db = createMockDb(rows);
+    const result = await queryHabitCompletions(db as never, "Habits", "2026-03-29", "2026-04-04");
+    expect(result[0].sectionOrder).toBeNull();
+  });
+
   it("returns createdDate as null when todoistCreatedAt is null", async () => {
     const rows = [
       {
-        taskId: "t1", content: "Cardio", sectionName: null, labels: [], description: null,
+        taskId: "t1", content: "Cardio", sectionName: null, sectionOrder: null, labels: [], description: null,
         todoistCreatedAt: null,
         completedDate: null, skippedDate: null,
       },
