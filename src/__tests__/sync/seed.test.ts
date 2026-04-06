@@ -107,6 +107,48 @@ describe("runSeed", () => {
     );
   });
 
+  it("does not overwrite active task data when same task appears in completed list", async () => {
+    const db = createMockDb();
+
+    // Recurring task "t1" appears in BOTH active tasks and completed tasks
+    vi.mocked(syncAll).mockResolvedValue({
+      projects: [{ id: "p1", name: "Habits", color: "blue", is_inbox_project: false, created_at: "2024-01-01T00:00:00Z" }],
+      sections: [{ id: "s1", project_id: "p1", name: "Coding Studies", order: 1 }],
+      activeTasks: [
+        {
+          id: "t1", content: "React Course", description: "", project_id: "p1",
+          section_id: "s1", parent_id: null, priority: 1, labels: [],
+          due: { date: "2024-06-16", is_recurring: true, string: "every day" },
+          is_completed: false, completed_at: null, created_at: "2024-01-01T00:00:00Z",
+        },
+      ],
+    });
+    vi.mocked(fetchCompletedTasks).mockResolvedValue([
+      {
+        task_id: "t1", content: "React Course", project_id: "p1",
+        section_id: "s1", completed_at: "2024-06-15T12:00:00Z", id: "t1",
+      },
+    ]);
+    vi.mocked(inferRecurringCompletions).mockResolvedValue(0);
+
+    await runSeed(db as never, "test-token", "America/Chicago");
+
+    // upsertTasks should be called once (for active tasks), NOT again with section_id: null
+    expect(upsertTasks).toHaveBeenCalledTimes(1);
+    expect(upsertTasks).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining([
+        expect.objectContaining({ id: "t1", section_id: "s1" }),
+      ])
+    );
+
+    // Completion should still be inserted
+    expect(insertTaskCompletion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ taskId: "t1", completedDate: "2024-06-15" })
+    );
+  });
+
   it("logs sync_log entries for start and success", async () => {
     const db = createMockDb();
 

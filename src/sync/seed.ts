@@ -44,6 +44,10 @@ export async function runSeed(
     await upsertSections(db, apiSections);
     await upsertTasks(db, apiActiveTasks);
 
+    // Track active task IDs so we don't overwrite their data with
+    // minimal completed-task stubs (which hardcode section_id to null).
+    const activeTaskIds = new Set(apiActiveTasks.map((t) => t.id));
+
     // Insert completions from the completed tasks API
     for (const ct of apiCompletedTasks) {
       const completedAt = new Date(ct.completed_at);
@@ -51,25 +55,27 @@ export async function runSeed(
         timeZone: timezone,
       });
 
-      // Upsert a minimal task row for completed tasks not in active list.
-      // Null out section_id — the section may have been deleted/archived
-      // and wouldn't be in our sections table (FK would fail).
-      await upsertTasks(db, [
-        {
-          id: ct.task_id,
-          content: ct.content,
-          description: "",
-          project_id: ct.project_id,
-          section_id: null,
-          parent_id: null,
-          priority: 1,
-          labels: [],
-          due: null,
-          is_completed: true,
-          completed_at: ct.completed_at,
-          created_at: ct.completed_at, // best approximation
-        },
-      ]);
+      // Only upsert a minimal task row if the task isn't already in the
+      // active set. Recurring tasks appear in both lists — upserting here
+      // would overwrite their section_id with null.
+      if (!activeTaskIds.has(ct.task_id)) {
+        await upsertTasks(db, [
+          {
+            id: ct.task_id,
+            content: ct.content,
+            description: "",
+            project_id: ct.project_id,
+            section_id: null,
+            parent_id: null,
+            priority: 1,
+            labels: [],
+            due: null,
+            is_completed: true,
+            completed_at: ct.completed_at,
+            created_at: ct.completed_at, // best approximation
+          },
+        ]);
+      }
 
       await insertTaskCompletion(db, {
         taskId: ct.task_id,
