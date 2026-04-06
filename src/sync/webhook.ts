@@ -174,11 +174,13 @@ async function handleItemCompleted(
 
     const oldDueDate = existingRows[0]?.dueDate ?? null;
     const incomingDueDate = (eventData.due as { date?: string } | null)?.date ?? null;
+    const incomingIsRecurring = (eventData.due as { is_recurring?: boolean } | null)?.is_recurring ?? false;
 
-    // If DB due date is stale (matches incoming advanced date) or task not found,
-    // fall back to today. Otherwise use the old due date (normal case).
+    // For recurring tasks, the due date advances on completion — if oldDueDate
+    // matches incoming (stale DB) or is absent, fall back to today.
+    // For non-recurring tasks, oldDueDate doesn't advance, so use it directly.
     const completedDate =
-      oldDueDate && oldDueDate !== incomingDueDate
+      oldDueDate && (!incomingIsRecurring || oldDueDate !== incomingDueDate)
         ? oldDueDate
         : getTodayInTimezone(timezone);
 
