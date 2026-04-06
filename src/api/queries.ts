@@ -157,6 +157,7 @@ export async function queryHabitCompletions(
       taskId: tasks.id,
       content: tasks.content,
       sectionName: sections.name,
+      sectionOrder: sections.order,
       labels: tasks.labels,
       description: tasks.description,
       todoistCreatedAt: tasks.todoistCreatedAt,
@@ -189,6 +190,7 @@ export async function queryHabitCompletions(
     taskId: string;
     content: string;
     sectionName: string | null;
+    sectionOrder: number | null;
     labels: string[];
     description: string | null;
     createdDate: string | null;
@@ -207,6 +209,7 @@ export async function queryHabitCompletions(
         taskId: row.taskId,
         content: row.content,
         sectionName: row.sectionName ?? null,
+        sectionOrder: row.sectionOrder ?? null,
         labels: row.labels,
         description: row.description ?? null,
         createdDate,
@@ -223,6 +226,7 @@ export async function queryHabitCompletions(
     taskId: h.taskId,
     content: h.content,
     sectionName: h.sectionName,
+    sectionOrder: h.sectionOrder,
     labels: h.labels,
     description: h.description,
     createdDate: h.createdDate,
