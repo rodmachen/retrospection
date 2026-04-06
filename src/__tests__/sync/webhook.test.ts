@@ -335,8 +335,8 @@ describe("processWebhookEvent — item:completed (recurring, stale DB)", () => {
   });
 });
 
-describe("processWebhookEvent — item:completed (non-recurring, no completed_at)", () => {
-  it("uses oldDueDate even when it equals incoming due date", async () => {
+describe("processWebhookEvent — item:completed (non-recurring, oldDueDate === incomingDueDate)", () => {
+  it("uses oldDueDate rather than falling back to today", async () => {
     // Edge case: task has no completed_at in payload but is NOT recurring.
     // Bug: oldDueDate === incomingDueDate causes incorrect fallback to today.
     vi.useFakeTimers();
@@ -364,7 +364,7 @@ describe("processWebhookEvent — item:completed (non-recurring, no completed_at
           priority: 1,
           labels: [],
           due: { date: "2024-06-15", is_recurring: false, string: "Jun 15" },
-          checked: false,
+          checked: true,
           completed_at: null, // absent (triggers the recurring branch)
           added_at: "2024-01-01T00:00:00Z",
         },
