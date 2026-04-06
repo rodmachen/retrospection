@@ -335,6 +335,57 @@ describe("processWebhookEvent — item:completed (recurring, stale DB)", () => {
   });
 });
 
+describe("processWebhookEvent — item:completed (non-recurring, no completed_at)", () => {
+  it("uses oldDueDate even when it equals incoming due date", async () => {
+    // Edge case: task has no completed_at in payload but is NOT recurring.
+    // Bug: oldDueDate === incomingDueDate causes incorrect fallback to today.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-06-16T18:00:00Z"));
+
+    const db = createMockDb();
+    // DB has same due date as incoming (non-recurring, due date doesn't advance)
+    db.select = vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => [{ dueDate: "2024-06-15" }]),
+      })),
+    }));
+
+    await processWebhookEvent(
+      db as never,
+      {
+        event_name: "item:completed",
+        event_data: {
+          id: "t1",
+          content: "One-off task",
+          description: "",
+          project_id: "p1",
+          section_id: null,
+          parent_id: null,
+          priority: 1,
+          labels: [],
+          due: { date: "2024-06-15", is_recurring: false, string: "Jun 15" },
+          checked: false,
+          completed_at: null, // absent (triggers the recurring branch)
+          added_at: "2024-01-01T00:00:00Z",
+        },
+      },
+      "America/Chicago",
+      "test-token"
+    );
+
+    // Should use oldDueDate "2024-06-15", NOT fall back to today "2024-06-16"
+    expect(insertTaskCompletion).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        taskId: "t1",
+        completedDate: "2024-06-15",
+      })
+    );
+
+    vi.useRealTimers();
+  });
+});
+
 describe("processWebhookEvent — item:completed (recurring, task not in DB)", () => {
   it("falls back to today when task not found in DB", async () => {
     vi.useFakeTimers();
