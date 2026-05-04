@@ -107,6 +107,17 @@ export default async function Home({ searchParams }: PageProps) {
           </section>
         ))
       )}
+
+      <footer className="mt-8 text-center">
+        <form action="/api/logout" method="POST">
+          <button
+            type="submit"
+            className="text-sm text-ink-muted hover:text-ink transition-colors"
+          >
+            Sign out
+          </button>
+        </form>
+      </footer>
     </main>
   );
 }
