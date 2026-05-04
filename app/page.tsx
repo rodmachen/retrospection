@@ -88,7 +88,8 @@ export default async function Home({ searchParams }: PageProps) {
 
       {groups.length === 0 ? (
         <p className="font-serif text-lg text-ink-muted text-center mt-16">
-          No habits to display.
+          No habits yet — make sure your Todoist &lsquo;Habits&rsquo; project
+          has tasks.
         </p>
       ) : (
         groups.map((group) => (

@@ -64,7 +64,7 @@ The retrospection app currently has no UI — only Next.js API routes that read 
 
 ## Steps
 
-### Step 1 — Frontend infrastructure: Tailwind, theme, root layout ✅ pending
+### Step 1 — Frontend infrastructure: Tailwind, theme, root layout ✅
 
 **Goal**: Get a styled "Hello" page rendering at `/` so the rest of the steps have a frame to build inside.
 
@@ -99,7 +99,7 @@ The retrospection app currently has no UI — only Next.js API routes that read 
 
 ---
 
-### Step 2 — Auth: password page + cookie session middleware ✅ pending
+### Step 2 — Auth: password page + cookie session middleware ✅
 
 **Goal**: All non-login routes (UI and API alike, except `/api/login` and `/api/webhook/*`) require a valid session cookie or redirect/401.
 
@@ -137,7 +137,7 @@ The retrospection app currently has no UI — only Next.js API routes that read 
 
 ---
 
-### Step 3 — Month grid + API client utilities (TDD) ✅ pending
+### Step 3 — Month grid + API client utilities (TDD) ✅
 
 **Goal**: Pure functions covering the calendar's date math and a typed fetcher, both unit-tested. No UI yet.
 
@@ -171,7 +171,7 @@ The retrospection app currently has no UI — only Next.js API routes that read 
 
 ---
 
-### Step 4 — Stacked monthly calendar UI ✅ pending
+### Step 4 — Stacked monthly calendar UI ✅
 
 **Goal**: The dashboard renders. Default = current month, all habits stacked, grouped by section, with prev/next month navigation.
 
@@ -218,7 +218,7 @@ The retrospection app currently has no UI — only Next.js API routes that read 
 
 ---
 
-### Step 5 — Polish, README, and PR finalization ✅ pending
+### Step 5 — Polish, README, and PR finalization ✅
 
 **Goal**: Empty/loading/error states, README updates, final lint/test pass, PR description complete.
 
