@@ -1,0 +1,35 @@
+{
+  "batch": 2,
+  "steps": [
+    {
+      "step": 4,
+      "commitSha": "04fa278f436be3fbda96802fdbea1fc3b5c895d1",
+      "filesChanged": [
+        "app/page.tsx",
+        "package.json",
+        "package-lock.json",
+        "src/web/classify-day.ts",
+        "src/web/__tests__/classify-day.test.ts",
+        "src/web/components/DayCell.tsx",
+        "src/web/components/MonthHeader.tsx",
+        "src/web/components/HabitCalendar.tsx"
+      ],
+      "verify": {
+        "typecheck": "pass",
+        "lint": "pass",
+        "test": "pass",
+        "build": "pass"
+      },
+      "designDecisions": "Single-column layout (max-w-2xl mx-auto) reads cleanly at 375px and stays comfortable at >=1280px without stretching calendars absurdly wide. aspect-square cells keep the grid proportional at any width; gap-1 between cells. Section heading rendered once per section (h2 font-serif text-2xl); habit name (font-serif text-xl) and right-aligned tabular-nums ratio (e.g. 12/30) per habit. M/T/W/T/F/S/S day-of-week labels in text-ink-muted uppercase tracking-wide. Lucide ChevronLeft/ChevronRight for prev/next navigation; Lucide X (strokeWidth 1.5) for skipped days to avoid the shoddy look of the literal 'X' glyph. Completed = filled bg-mark circle with paper-colored numeral; pending = outlined border-ink/30 circle; !inMonth = opacity-30 fade with no marker.",
+      "notes": "Added lucide-react as a runtime dependency for ChevronLeft, ChevronRight, and X icons. app/page.tsx is an async server component; searchParams is awaited per Next 15. Cookies are forwarded to /api/habits/completions via next/headers cookies() joined into a single Cookie header. Default month uses UTC (now.getUTCFullYear/getUTCMonth+1). Grouping in groupBySection sorts groups by sectionOrder asc, habits within a section by content asc (localeCompare). MonthHeader's prev/next links go to /?month=YYYY-MM with zero-padded month. Visual verification (mobile/desktop widths, prev/next nav, seeded data) deferred to Step 5/manual review — headless dev server cannot render meaningfully."
+    }
+  ],
+  "assumptions": [
+    "lucide-react is acceptable as a runtime dep (added per orchestrator's instruction). It's tree-shakable; only ChevronLeft, ChevronRight, X are imported.",
+    "Section heading is rendered at the page/section level rather than per-habit, so multiple habits in the same section share one heading. The plan mentioned a 'small dim section label' on the habit card, but with a section heading present that would be redundant; chose the cleaner of the two readings.",
+    "Ratio = (completionDates count within YYYY-MM prefix) / (calendar days in month). The plan's '12/22' example was illustrative; '12/30' for April matches the spec's literal '... count of completionDates in this month / total month days'.",
+    "DayCell's `inMonth` is computed in HabitCalendar by comparing date.getUTCMonth()+1 to monthGrid.month — month-grid.ts already returns dates that span weeks across month boundaries, so this is the right boundary check.",
+    "Empty-state copy ('No habits to display.') is a placeholder; Step 5 owns the friendlier empty/loading/error states per the plan."
+  ],
+  "blockers": []
+}
