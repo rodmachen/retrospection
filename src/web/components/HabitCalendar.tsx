@@ -1,5 +1,5 @@
 import type { HabitCompletion } from "../habits-client";
-import type { MonthGrid } from "../month-grid";
+import { type MonthGrid, formatYmd } from "../month-grid";
 import { classifyDay } from "../classify-day";
 import { DayCell } from "./DayCell";
 
@@ -54,11 +54,7 @@ export function HabitCalendar({ habit, monthGrid }: HabitCalendarProps) {
         ))}
       </div>
 
-      <div
-        className="grid grid-cols-7 gap-1"
-        role="grid"
-        aria-label={`${habit.content} — month grid`}
-      >
+      <div className="grid grid-cols-7 gap-1">
         {monthGrid.weeks.flatMap((week) =>
           week.map((date) => {
             const inMonth = date.getUTCMonth() + 1 === monthGrid.month;
@@ -69,7 +65,7 @@ export function HabitCalendar({ habit, monthGrid }: HabitCalendarProps) {
             );
             return (
               <DayCell
-                key={date.toISOString()}
+                key={formatYmd(date)}
                 date={date}
                 inMonth={inMonth}
                 status={status}

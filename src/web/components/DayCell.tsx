@@ -19,7 +19,8 @@ export function DayCell({ date, inMonth, status }: DayCellProps) {
   } else if (status === "completed") {
     inner = (
       <span className="flex items-center justify-center w-full h-full rounded-full bg-mark text-paper text-sm font-medium tabular-nums">
-        {day}
+        <span aria-hidden="true">{day}</span>
+        <span className="sr-only">{day} (completed)</span>
       </span>
     );
   } else if (status === "skipped") {
