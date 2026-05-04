@@ -30,7 +30,10 @@ export async function fetchHabitCompletions({
   cookie,
 }: FetchParams): Promise<HabitCompletion[]> {
   const base =
-    process.env.INTERNAL_BASE_URL ?? "http://localhost:3000";
+    process.env.INTERNAL_BASE_URL ??
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
   const url = new URL("/api/habits/completions", base);
   url.searchParams.set("project", project);
   url.searchParams.set("start", start);
