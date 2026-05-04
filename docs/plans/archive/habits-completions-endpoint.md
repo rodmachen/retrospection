@@ -8,7 +8,7 @@ The command-center daily briefing is being refactored to show a 7-day rolling ha
 
 ---
 
-## Step 1: New query function
+## Step 1: New query function ✅
 
 **Model: Sonnet** | TDD
 
@@ -28,7 +28,7 @@ The flat SQL rows (one per task per completion date) are aggregated in JS into o
 
 ---
 
-## Step 2: New API endpoint
+## Step 2: New API endpoint ✅
 
 **Model: Sonnet** | Tests-alongside
 
