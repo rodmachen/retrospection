@@ -56,6 +56,6 @@ export const config = {
      *   _next/*            — Next.js internals
      *   Static assets      — favicon, images, etc.
      */
-    "/((?!login|api/login|api/webhook|_next/|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)).*)",
+    "/((?!login|api/login|api/health|api/webhook|_next/|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)).*)",
   ],
 };
