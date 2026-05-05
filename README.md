@@ -82,6 +82,27 @@ Authorization: Bearer <API_KEY>
 | `GET /api/sync/status` | Latest sync log entry |
 | `POST /api/sync/trigger` | Manually trigger a full reseed |
 
+## Running the habits dashboard locally
+
+The dashboard is password-gated. After completing the Setup steps above, add these additional env vars to `.env.local`:
+
+| Variable | Description |
+|---|---|
+| `APP_PASSWORD` | Shared login password for the dashboard |
+| `SESSION_SECRET` | Cookie signing secret — must be 32+ characters (`openssl rand -hex 32`) |
+
+Then:
+
+```bash
+npm install
+npx drizzle-kit push   # apply schema if not already done
+npm run dev
+```
+
+Navigate to `http://localhost:3000/login`, enter `APP_PASSWORD`, and you will land on the habits calendar dashboard.
+
+The existing `API_KEY` bearer-token auth for REST endpoints continues to work alongside the session cookie — CLI and webhook clients are unaffected.
+
 ## Development
 
 ```bash

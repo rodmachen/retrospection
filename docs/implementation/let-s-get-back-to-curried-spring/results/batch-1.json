@@ -1,0 +1,71 @@
+{
+  "batch": 1,
+  "steps": [
+    {
+      "step": 1,
+      "commitSha": "aa4e4d4",
+      "filesChanged": [
+        ".eslintrc.json",
+        "app/globals.css",
+        "app/layout.tsx",
+        "app/page.tsx",
+        "postcss.config.mjs",
+        "package.json",
+        "package-lock.json"
+      ],
+      "verify": {
+        "typecheck": "pass",
+        "lint": "pass",
+        "test": "pass",
+        "build": "pass"
+      },
+      "notes": "No tailwind.config.ts created — Tailwind v4 uses CSS-based config via @theme in globals.css. Added .eslintrc.json (extends next/core-web-vitals) because next lint was unconfigured and prompted interactively. Fonts: Lora (--font-serif) and Inter (--font-sans) via next/font/google."
+    },
+    {
+      "step": 2,
+      "commitSha": "7fd8afd",
+      "filesChanged": [
+        "src/auth/session.ts",
+        "src/auth/__tests__/session.test.ts",
+        "app/api/login/route.ts",
+        "app/api/logout/route.ts",
+        "app/login/page.tsx",
+        "middleware.ts",
+        ".env.example",
+        "package.json",
+        "package-lock.json"
+      ],
+      "verify": {
+        "typecheck": "pass",
+        "lint": "pass",
+        "test": "pass",
+        "build": "pass"
+      },
+      "notes": "TDD for session.ts: 6 tests written first (all failed), then implementation. Fixed TS2540 (NODE_ENV readonly) in test by casting process.env. Middleware updated to handle both UI routes (cookie→redirect) and API routes (cookie OR bearer token). Old middleware only covered API bearer auth; new matcher pattern covers all routes except login, api/login, api/webhook, _next, and static assets."
+    },
+    {
+      "step": 3,
+      "commitSha": "4e0024f",
+      "filesChanged": [
+        "src/web/__tests__/month-grid.test.ts",
+        "src/web/month-grid.ts",
+        "src/web/habits-client.ts"
+      ],
+      "verify": {
+        "typecheck": "pass",
+        "lint": "pass",
+        "test": "pass",
+        "build": "pass"
+      },
+      "notes": "Strict TDD: 12 tests written first (confirmed failing), then implementation until all pass. All date math uses UTC to avoid local-timezone drift. Monday-first via (getUTCDay()+6)%7. addMonths uses flat 0-based month index to handle Dec→Jan and Jan→Dec rollover correctly. habits-client.ts uses INTERNAL_BASE_URL env var (defaults to http://localhost:3000) for server-side fetching."
+    }
+  ],
+  "assumptions": [
+    "ESLint was not configured before Step 1; added .eslintrc.json extending next/core-web-vitals as it was required for `npm run lint` to exit non-interactively.",
+    "Tailwind v4 CSS-based @theme config does not require a tailwind.config.ts file.",
+    "iron-session@8 getIronSession works with Next.js 15 App Router API routes by accepting (request, response) and calling session.save() before returning the response.",
+    "The middleware matcher regex excludes /login (no leading slash) which covers both GET /login (page) and is combined with explicit /api/login exclusion.",
+    "INTERNAL_BASE_URL defaults to http://localhost:3000 for local dev; production deployments should set this to the internal service URL."
+  ],
+  "blockers": []
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "severity": "non-blocking",
+    "location": "middleware.ts:59",
+    "description": "The new matcher protects /api/health, but on origin/main /api/health was excluded (matcher was `/api/((?!health|webhook).*)`). The current README at lines 73-78 still documents `GET /api/health` as a 'Health check (no auth)' endpoint. Calls without a session cookie or bearer token now return 401 instead of `{status:'ok'}`, which silently breaks any external uptime probe pointed at the deployed Vercel URL.",
+    "suggestion": "Add `api/health` to the matcher's negative lookahead alongside `api/login` / `api/webhook` so the endpoint stays public, OR update the README to reflect the new behavior. Restoring the exclusion is the lower-friction fix and matches existing documentation."
+  },
+  {
+    "severity": "non-blocking",
+    "location": "src/web/habits-client.ts:9-10",
+    "description": "`HabitCompletion.section: string` and `sectionOrder: number` are typed as non-null, but `app/api/habits/completions/route.ts:27-28` forwards `h.sectionName` / `h.sectionOrder` from `queryHabitCompletions`, where both are `string | null` (LEFT JOIN against `sections`). A habit assigned to no Todoist section returns `null` and (a) is keyed as `null` in `groupBySection`'s Map, (b) sorts with `null - null = NaN` in `groups.sort`, and (c) renders an empty `<h2>`. This isn't a crash but the section-grouping invariant the plan calls out (use `sectionOrder`) silently breaks.",
+    "suggestion": "Either tighten the API to provide defaults (e.g. `section: h.sectionName ?? 'Uncategorized'`, `sectionOrder: h.sectionOrder ?? Number.MAX_SAFE_INTEGER`) or widen `HabitCompletion` to `section: string | null` / `sectionOrder: number | null` and make `groupBySection` coalesce explicitly. The first option preserves the plan's grouping intent more cleanly."
+  },
+  {
+    "severity": "non-blocking",
+    "location": "src/web/habits-client.ts:32-33",
+    "description": "`fetchHabitCompletions` falls back to `http://localhost:3000` when `INTERNAL_BASE_URL` is unset. The existing README documents step 6 'Deploy to Vercel', and `.env.example` does not list `INTERNAL_BASE_URL`. After deploy, the server component's self-fetch will try localhost, fail, and the dashboard will not render. Local dev is fine; Vercel is not.",
+    "suggestion": "Either (a) call the database directly from the server component instead of round-tripping through the HTTP API (preferred — avoids the cookie-forwarding dance entirely), or (b) widen the fallback chain to include `process.env.VERCEL_URL ? \\`https://${process.env.VERCEL_URL}\\` : 'http://localhost:3000'` and add `INTERNAL_BASE_URL` to `.env.example` with a comment about Vercel."
+  },
+  {
+    "severity": "non-blocking",
+    "location": "src/web/components/HabitCalendar.tsx:58-60",
+    "description": "The day-grid container claims `role=\"grid\"` but its DayCell descendants have no `role=\"row\"` or `role=\"gridcell\"`. Asserting `role=\"grid\"` on an element whose children don't follow the WAI-ARIA grid pattern is worse than leaving the implicit semantics in place — assistive tech may announce the container as a grid and then fail to navigate it correctly.",
+    "suggestion": "Drop `role=\"grid\"` and `aria-label` from the cell-container div (the visible header text already labels the section), or wrap each week in a `role=\"row\"` and give DayCell `role=\"gridcell\"`. Removing the role is the smaller change and a net improvement."
+  },
+  {
+    "severity": "non-blocking",
+    "location": "src/web/components/DayCell.tsx:19-42",
+    "description": "Only the `skipped` branch carries a screen-reader status (`<span className=\"sr-only\">{day} (skipped)</span>`). Completed and pending cells render only the bare day number, so an AT user cannot distinguish a completed day from a pending one — both are read as just '15'.",
+    "suggestion": "Add an sr-only suffix on the completed branch (`<span className=\"sr-only\"> (completed)</span>`) or move status into an `aria-label` on the outer cell. Pending can stay bare since it is the default state."
+  },
+  {
+    "severity": "non-blocking",
+    "location": "docs/implementation/smoke-test/results/result.json",
+    "description": "`docs/implementation/smoke-test/result.json` and `stdout.json` arrived in this PR via the housekeeping commit `089b49c`. They aren't related to the habits-calendar feature and aren't referenced anywhere. Context.md flags this travels with the PR. It clutters the diff and `docs/implementation/` is meant for orchestration artifacts of real plans.",
+    "suggestion": "Delete `docs/implementation/smoke-test/` from the branch. Either drop those two files via a follow-up commit before merge, or amend the housekeeping commit out (it's the very first commit on the branch)."
+  },
+  {
+    "severity": "non-blocking",
+    "location": "app/api/logout/route.ts",
+    "description": "The logout endpoint exists but no UI surface invokes it — there is no logout button or link anywhere in the dashboard. The plan's Step 2 only required the endpoint, so this is plan-conforming, but practically the user has no way to clear their session short of devtools.",
+    "suggestion": "Add a small 'Sign out' link in the page footer or near the MonthHeader that posts to `/api/logout` and redirects to `/login`. Defer to v2 if scope creep is a concern, but worth a single-line entry in the v2 follow-up list."
+  },
+  {
+    "severity": "non-blocking",
+    "location": "src/web/components/HabitCalendar.tsx:72",
+    "description": "`key={date.toISOString()}` works but is heavier than necessary — the date is already known to be unique within a month grid, and a simpler `formatYmd(date)` key would match the YMD identity used everywhere else in the file. Trivial perf/style nit.",
+    "suggestion": "Switch to `key={formatYmd(date)}` for consistency with the rest of the date handling. Optional."
+  }
+]

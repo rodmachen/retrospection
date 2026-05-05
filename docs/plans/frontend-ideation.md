@@ -1,3 +1,5 @@
+> **View 4 - Monthly** is realized as of v1 — see [`let-s-get-back-to-curried-spring.md`](./let-s-get-back-to-curried-spring.md).
+
 # Ideation for Retrospection Frontend
 
 ## Overall Frontend

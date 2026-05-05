@@ -24,8 +24,8 @@ export async function GET(request: NextRequest) {
     habits.map((h) => ({
       taskId: h.taskId,
       content: h.content,
-      section: h.sectionName,
-      sectionOrder: h.sectionOrder,
+      section: h.sectionName ?? "Uncategorized",
+      sectionOrder: h.sectionOrder ?? Number.MAX_SAFE_INTEGER,
       labels: h.labels,
       description: h.description ?? "",
       createdDate: h.createdDate,

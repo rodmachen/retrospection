@@ -6,7 +6,7 @@ When a recurring habit is "completed forever" in Todoist, its `isCompleted` fiel
 
 **Fix:** Add `eq(tasks.isCompleted, false)` to the WHERE clause.
 
-## Step 1: Add isCompleted filter and test (tests-alongside, **Sonnet**)
+## Step 1: Add isCompleted filter and test (tests-alongside, **Sonnet**) ✅
 
 **Files modified:**
 - `src/api/queries.ts`
@@ -36,7 +36,7 @@ All tests pass.
 
 **Commit, push, open PR.**
 
-## Step 2: Manual verification (**Sonnet**)
+## Step 2: Manual verification (**Sonnet**) ✅
 
 After deploying or running locally, confirm Quizlet no longer appears:
 
