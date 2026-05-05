@@ -52,10 +52,11 @@ export const config = {
      * Match all paths except:
      *   /login             — password form (public)
      *   /api/login         — login API (public)
+     *   /api/logout        — logout must work even with an expired session
      *   /api/webhook/*     — Todoist webhook (bearer-token gated separately)
      *   _next/*            — Next.js internals
      *   Static assets      — favicon, images, etc.
      */
-    "/((?!login|api/login|api/health|api/webhook|_next/|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)).*)",
+    "/((?!login|api/login|api/logout|api/health|api/webhook|_next/|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)).*)",
   ],
 };

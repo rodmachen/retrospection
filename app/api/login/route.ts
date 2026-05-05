@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getIronSession } from "iron-session";
 import { getSessionOptions, type SessionData } from "@/auth/session";
@@ -11,7 +12,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   }
 
-  if (!password || password !== appPassword) {
+  const a = Buffer.from(password ?? "");
+  const b = Buffer.from(appPassword);
+  const match = a.length === b.length && timingSafeEqual(a, b);
+  if (!match) {
     return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
   }
 

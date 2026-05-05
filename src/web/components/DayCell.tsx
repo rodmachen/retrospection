@@ -14,7 +14,7 @@ export function DayCell({ date, inMonth, status }: DayCellProps) {
   let inner: React.ReactNode;
   if (!inMonth) {
     inner = (
-      <span className="text-sm text-ink tabular-nums">{day}</span>
+      <span className="text-sm text-ink tabular-nums" aria-hidden="true">{day}</span>
     );
   } else if (status === "completed") {
     inner = (
@@ -37,7 +37,8 @@ export function DayCell({ date, inMonth, status }: DayCellProps) {
   } else {
     inner = (
       <span className="flex items-center justify-center w-full h-full rounded-full border border-ink/30 text-ink text-sm tabular-nums">
-        {day}
+        <span aria-hidden="true">{day}</span>
+        <span className="sr-only">{day} (pending)</span>
       </span>
     );
   }
